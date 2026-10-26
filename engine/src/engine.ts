@@ -14,7 +14,7 @@ import {
 import { type EngineError, type Result, RuleError, fail } from './errors';
 import { getPlayer, label } from './helpers';
 import { nightChoose, nightProceed, startNight } from './night';
-import { MAX_PLAYERS, MIN_PLAYERS, ROLES, validateComposition } from './roles';
+import { MAX_PLAYERS, MAX_SEAT, MIN_PLAYERS, ROLES, validateComposition } from './roles';
 import { shuffle } from './rng';
 import { withDefaults } from './settings';
 import type { CreateGameEvent, GameEvent, GameState, Player, Role } from './types';
@@ -36,6 +36,22 @@ function createState(e: CreateGameEvent): GameState {
   const ids = new Set(e.players.map((p) => p.id));
   if (ids.size !== n || e.players.some((p) => !p.id)) fail('players.ids', 'У игроков должны быть разные id');
 
+  // Players stay in the given (seating) order. Seat numbers are labels from the table cards:
+  // either given for everyone (1–20, unique) or 1..N in the given order.
+  const given = e.players.map((p) => p.seat);
+  let seats: number[];
+  if (given.every((s) => s === undefined)) {
+    seats = e.players.map((_, i) => i + 1);
+  } else {
+    if (given.some((s) => s === undefined)) fail('players.seats', 'Укажите номер каждого игрока');
+    seats = given as number[];
+    if (seats.some((s) => !Number.isInteger(s) || s < 1 || s > MAX_SEAT)) {
+      fail('players.seatRange', `Номера мест — от 1 до ${MAX_SEAT}`);
+    }
+    const dup = seats.find((s, i) => seats.indexOf(s) !== i);
+    if (dup !== undefined) fail('players.seatDup', `Номер ${dup} занят дважды`);
+  }
+
   const check = validateComposition(n, e.composition);
   const firstError = check.errors[0];
   if (firstError) fail(firstError.code, firstError.message);
@@ -56,8 +72,8 @@ function createState(e: CreateGameEvent): GameState {
 
   const players: Player[] = e.players.map((p, i) => ({
     id: p.id,
-    seat: i + 1,
-    name: p.name.trim() || `Игрок ${i + 1}`,
+    seat: seats[i] as number,
+    name: p.name.trim() || `Игрок ${seats[i]}`,
     role: roles[i] as Role,
     alive: true,
     death: null,

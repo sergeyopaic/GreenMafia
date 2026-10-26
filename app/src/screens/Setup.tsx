@@ -2,8 +2,10 @@ import {
   CLASSIC_SETTINGS,
   type Composition,
   MAX_PLAYERS,
+  MAX_SEAT,
   MIN_PLAYERS,
   PRESETS,
+  type Player,
   type PresetName,
   ROLES,
   ROLE_TEAM,
@@ -16,7 +18,8 @@ import {
   validateComposition,
 } from '@greenmafia/engine';
 import { useEffect, useMemo, useState } from 'react';
-import { MiniChip } from '../components/Chip';
+import { Chip, MiniChip } from '../components/Chip';
+import { Sheet } from '../components/Sheet';
 import { IconBack, RoleIcon } from '../components/icons';
 import { type PlayerProfile, loadPlayers, normalizeName, resolveSeats, savePlayers } from '../lib/players';
 import { type LastSetup, loadLastSetup, saveLastSetup } from '../lib/storage';
@@ -28,6 +31,24 @@ const STEP_TITLES = ['Игроки', 'Состав', 'Правила', 'Разд
 
 function resize(names: string[], n: number): string[] {
   return Array.from({ length: n }, (_, i) => names[i] ?? '');
+}
+
+/** Keeps the first `n` seat numbers; new places get the smallest free numbers. */
+function resizeSeats(seats: number[], n: number): number[] {
+  const kept = seats.slice(0, n);
+  for (let k = 1; kept.length < n && k <= MAX_SEAT; k++) if (!kept.includes(k)) kept.push(k);
+  return kept;
+}
+
+const seatsInOrder = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+
+function validSeats(seats: unknown, n: number): seats is number[] {
+  return (
+    Array.isArray(seats) &&
+    seats.length === n &&
+    seats.every((x) => Number.isInteger(x) && x >= 1 && x <= MAX_SEAT) &&
+    new Set(seats).size === n
+  );
 }
 
 function withCivilians(c: Composition, n: number): Composition {
@@ -61,6 +82,7 @@ export function SetupScreen() {
   const [step, setStep] = useState<Step>(0);
   const [count, setCount] = useState(10);
   const [names, setNames] = useState<string[]>(resize([], 10));
+  const [seatNums, setSeatNums] = useState<number[]>(seatsInOrder(10));
   const [compRaw, setComp] = useState<Composition>(recommendedComposition(10));
   const comp = useMemo(() => normalizeComposition(compRaw, count), [compRaw, count]);
   const [settings, setSettings] = useState<Settings>(CLASSIC_SETTINGS);
@@ -78,6 +100,7 @@ export function SetupScreen() {
         const n = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, last.count));
         setCount(n);
         setNames(resize(last.names, n));
+        setSeatNums(validSeats(last.seats, n) ? last.seats : seatsInOrder(n));
         setSettings({ ...CLASSIC_SETTINGS, ...last.settings, timers: { ...CLASSIC_SETTINGS.timers, ...last.settings.timers } });
         const saved = normalizeComposition(last.composition, n);
         setComp(validateComposition(n, saved).errors.length === 0 ? saved : recommendedComposition(n));
@@ -93,10 +116,30 @@ export function SetupScreen() {
     const c = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, n));
     setCount(c);
     setNames((ns) => resize(ns, c));
+    setSeatNums((ss) => resizeSeats(ss, c));
     setComp(recommendedComposition(c));
   }
 
-  const players = names.map((name, i) => ({ id: `p${i + 1}`, name: name.trim() || `Игрок ${i + 1}` }));
+  const players = names.map((name, i) => ({ id: `p${i + 1}`, name: name.trim() || `Игрок ${seatNums[i]}` }));
+
+  /** Moves a person (name and number together) one place in the seating order. */
+  function moveRow(i: number, d: -1 | 1) {
+    const j = i + d;
+    if (j < 0 || j >= names.length) return;
+    const swap = <T,>(arr: T[]) => {
+      const copy = [...arr];
+      [copy[i], copy[j]] = [copy[j] as T, copy[i] as T];
+      return copy;
+    };
+    setNames(swap(names));
+    setSeatNums(swap(seatNums));
+  }
+
+  /** Gives `seat` to a row; numbers are unique, the picker never offers a taken one. */
+  function setSeat(row: number, seat: number) {
+    if (seatNums.some((x, j) => x === seat && j !== row)) return;
+    setSeatNums(seatNums.map((x, j) => (j === row ? seat : x)));
+  }
 
   /** Seats a profile in the first empty place (adding a place if needed) or frees its place. */
   function toggleProfile(p: PlayerProfile) {
@@ -113,6 +156,7 @@ export function SetupScreen() {
       const n = count + 1;
       setCount(n);
       setNames([...names, p.name]);
+      setSeatNums(resizeSeats(seatNums, n));
       setComp(recommendedComposition(n));
     } else {
       useApp.getState().showToast(`За столом уже ${MAX_PLAYERS} игроков`);
@@ -135,12 +179,12 @@ export function SetupScreen() {
     const event = {
       type: 'CreateGame' as const,
       settings,
-      players: seats.players,
+      players: seats.players.map((pl, i) => ({ ...pl, seat: seatNums[i] })),
       composition: comp,
       dealing,
       ...(dealing === 'app' ? { seed: randomSeed() } : { roles: cardRoles as Role[] }),
     };
-    const last: LastSetup = { names, count, preset: samePreset(settings), settings, composition: comp, dealing };
+    const last: LastSetup = { names, seats: seatNums, count, preset: samePreset(settings), settings, composition: comp, dealing };
     void saveLastSetup(last);
     startGame(event);
   }
@@ -198,6 +242,10 @@ export function SetupScreen() {
         <PlayersStep
           count={count}
           names={names}
+          seatNums={seatNums}
+          onSeat={setSeat}
+          onMove={moveRow}
+          onResetSeats={() => setSeatNums(seatsInOrder(count))}
           onCount={changeCount}
           onNames={setNames}
           profiles={profiles}
@@ -209,7 +257,7 @@ export function SetupScreen() {
       {step === 1 && <CompositionStep count={count} comp={comp} onComp={(c) => setComp(withCivilians(c, count))} check={check} />}
       {step === 2 && <RulesStep settings={settings} onChange={setSettings} />}
       {step === 3 && <DealStep dealing={dealing} onDealing={setDealing} count={count} comp={comp} />}
-      {step === 4 && <CardsStep names={players.map((p) => p.name)} roles={cardRoles} comp={comp} onRoles={setCardRoles} />}
+      {step === 4 && <CardsStep names={players.map((p) => p.name)} seats={seatNums} roles={cardRoles} comp={comp} onRoles={setCardRoles} />}
 
       <div className="actions">
         <div className="actions__row">
@@ -230,8 +278,12 @@ export function SetupScreen() {
 function PlayersStep({
   count,
   names,
+  seatNums,
   onCount,
   onNames,
+  onSeat,
+  onMove,
+  onResetSeats,
   profiles,
   onToggle,
   error,
@@ -239,21 +291,22 @@ function PlayersStep({
 }: {
   count: number;
   names: string[];
+  seatNums: number[];
   onCount: (n: number) => void;
   onNames: (n: string[]) => void;
+  onSeat: (row: number, seat: number) => void;
+  onMove: (row: number, d: -1 | 1) => void;
+  onResetSeats: () => void;
   profiles: PlayerProfile[];
   onToggle: (p: PlayerProfile) => void;
   error: string | null;
   newNames: string[];
 }) {
   const seatedKeys = new Set(names.map(normalizeName).filter(Boolean));
-  function move(i: number, d: -1 | 1) {
-    const j = i + d;
-    if (j < 0 || j >= names.length) return;
-    const copy = [...names];
-    [copy[i], copy[j]] = [copy[j] ?? '', copy[i] ?? ''];
-    onNames(copy);
-  }
+  const [picking, setPicking] = useState<number | null>(null);
+  const inOrder = seatNums.every((n, i) => n === i + 1);
+  const label = (i: number) => names[i]?.trim() || `Игрок ${seatNums[i]}`;
+
   return (
     <>
       <section className="folder">
@@ -291,27 +344,34 @@ function PlayersStep({
       )}
 
       <section className="field">
-        <div className="field__label">Имена по порядку мест, по часовой стрелке</div>
+        <div className="field__label">Порядок посадки по часовой стрелке · фишка — номер с карточки</div>
         {names.map((name, i) => (
           <div className="name-row" key={i}>
-            <MiniChip player={{ seat: i + 1 }} />
+            <button
+              type="button"
+              className="seat-pick"
+              onClick={() => setPicking(i)}
+              aria-label={`Номер ${seatNums[i]} — сменить номер игрока ${label(i)}`}
+            >
+              <MiniChip player={{ seat: seatNums[i] ?? i + 1 }} />
+            </button>
             <input
               className="input"
               value={name}
-              placeholder={`Игрок ${i + 1}`}
+              placeholder={`Игрок ${seatNums[i]}`}
               maxLength={20}
               onChange={(e) => {
                 const copy = [...names];
                 copy[i] = e.target.value;
                 onNames(copy);
               }}
-              aria-label={`Имя игрока на месте ${i + 1}`}
+              aria-label={`Имя игрока с номером ${seatNums[i]}`}
             />
             <div className="name-row__move">
-              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Выше">
+              <button type="button" onClick={() => onMove(i, -1)} disabled={i === 0} aria-label="Выше">
                 ↑
               </button>
-              <button type="button" onClick={() => move(i, 1)} disabled={i === names.length - 1} aria-label="Ниже">
+              <button type="button" onClick={() => onMove(i, 1)} disabled={i === names.length - 1} aria-label="Ниже">
                 ↓
               </button>
             </div>
@@ -321,11 +381,73 @@ function PlayersStep({
         {!error && newNames.length > 0 && (
           <div className="notice">Новые в базе после старта: {newNames.join(', ')}.</div>
         )}
-        <button type="button" className="btn btn--ghost" style={{ alignSelf: 'flex-start' }} onClick={() => onNames(names.map(() => ''))}>
-          очистить имена
-        </button>
+        <p className="list__sub">Речи идут по порядку посадки. Номер — только метка игрока: нажмите на фишку, чтобы выбрать его (1–20).</p>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn--ghost" onClick={() => onNames(names.map(() => ''))}>
+            очистить имена
+          </button>
+          {!inOrder && (
+            <button type="button" className="btn btn--ghost" onClick={onResetSeats}>
+              номера по порядку 1–{count}
+            </button>
+          )}
+        </div>
       </section>
+
+      {picking !== null && (
+        <SeatPicker
+          title={`Номер: ${label(picking)}`}
+          current={seatNums[picking] ?? 0}
+          takenBy={(n) => {
+            const row = seatNums.findIndex((x, j) => x === n && j !== picking);
+            return row >= 0 ? label(row) : null;
+          }}
+          onPick={(n) => {
+            onSeat(picking, n);
+            setPicking(null);
+          }}
+          onClose={() => setPicking(null)}
+        />
+      )}
     </>
+  );
+}
+
+/** Chips 1–20; numbers taken by other players cannot be chosen. */
+function SeatPicker({
+  title,
+  current,
+  takenBy,
+  onPick,
+  onClose,
+}: {
+  title: string;
+  current: number;
+  takenBy: (n: number) => string | null;
+  onPick: (n: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet title={title} onClose={onClose}>
+      <p className="muted">Выберите номер, как на карточке игрока. Занятые номера недоступны.</p>
+      <div className="chips chips--5 seat-grid" role="group" aria-label="Номера 1–20">
+        {Array.from({ length: MAX_SEAT }, (_, k) => k + 1).map((n) => {
+          const holder = takenBy(n);
+          const chip: Player = { id: `seat${n}`, seat: n, name: '', role: 'civilian', alive: true, death: null, fouls: 0, skipNextSpeech: false };
+          return (
+            <Chip
+              key={n}
+              player={chip}
+              look={{ selected: n === current, disabled: !!holder, inert: !!holder, tag: holder ?? (n === current ? 'сейчас' : '') }}
+              onClick={() => onPick(n)}
+            />
+          );
+        })}
+      </div>
+      <button type="button" className="btn btn--secondary" onClick={onClose}>
+        Отмена
+      </button>
+    </Sheet>
   );
 }
 
@@ -560,11 +682,13 @@ function cardsValid(roles: (Role | '')[], comp: Composition, count: number): boo
 
 function CardsStep({
   names,
+  seats,
   roles,
   comp,
   onRoles,
 }: {
   names: string[];
+  seats: number[];
   roles: (Role | '')[];
   comp: Composition;
   onRoles: (r: (Role | '')[]) => void;
@@ -578,7 +702,7 @@ function CardsStep({
       <div className="list">
         {names.map((name, i) => (
           <div className="list__row" key={i} style={{ flexWrap: 'wrap' }}>
-            <MiniChip player={{ seat: i + 1 }} />
+            <MiniChip player={{ seat: seats[i] ?? i + 1 }} />
             <div className="list__main">{name}</div>
             <select
               className="input"
@@ -589,7 +713,7 @@ function CardsStep({
                 copy[i] = e.target.value as Role | '';
                 onRoles(copy);
               }}
-              aria-label={`Роль игрока ${i + 1}`}
+              aria-label={`Роль игрока ${seats[i] ?? i + 1}`}
             >
               <option value="">—</option>
               {ROLES.map((r) => (

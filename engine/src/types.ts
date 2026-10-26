@@ -19,7 +19,7 @@ export interface Death {
 
 export interface Player {
   id: string;
-  /** 1..N, clockwise. Never changes. */
+  /** Number on the player's table card, 1–20. Only a label: the order is the seating order. Never changes. */
   seat: number;
   name: string;
   role: Role;
@@ -140,7 +140,7 @@ export interface GameState {
   composition: Composition;
   dealing: 'app' | 'cards';
   seed: string | null;
-  /** Sorted by seat. */
+  /** In seating order, clockwise. Speeches, the deal and the night grid follow this order. */
   players: Player[];
   phase: Phase;
   nights: NightRecord[];
@@ -157,8 +157,12 @@ export interface GameState {
 export interface CreateGameEvent {
   type: 'CreateGame';
   settings: Settings;
-  /** In seat order. */
-  players: { id: string; name: string }[];
+  /**
+   * Players in seating order (clockwise), with optional seat numbers (1–20, unique; from the table cards).
+   * The number is only a label. Without seats, players are numbered 1..N in the given order.
+   * `roles` (dealing `cards`) follow the same order as `players`.
+   */
+  players: { id: string; name: string; seat?: number }[];
   composition: Composition;
   /** `app` — the app deals with `seed`; `cards` — the host enters `roles` (by seat). */
   dealing: 'app' | 'cards';

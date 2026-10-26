@@ -53,11 +53,10 @@ export function firstSpeakerFor(state: GameState): Player {
   const prev = state.days[state.days.length - 1];
   let first: Player | undefined;
   if (prev && state.settings.speakingOrder === 'rotating') {
-    const prevSeat = findPlayer(state, prev.firstSpeaker)?.seat ?? 0;
-    first = nextAliveAfter(state, prevSeat);
+    first = nextAliveAfter(state, prev.firstSpeaker);
   } else {
-    // Seat 1 if alive, otherwise the next alive one.
-    first = nextAliveAfter(state, state.players.length);
+    // The first alive player in seating order.
+    first = nextAliveAfter(state, null);
   }
   if (!first) fail('day.noPlayers', 'Не осталось живых игроков');
   return first;
@@ -69,7 +68,7 @@ export function startDay(state: GameState, number: number): void {
   let p: Player | undefined = first;
   while (p && !order.includes(p.id)) {
     order.push(p.id);
-    p = nextAliveAfter(state, p.seat);
+    p = nextAliveAfter(state, p.id);
   }
   const day: DayRecord = {
     number,

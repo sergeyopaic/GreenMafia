@@ -2181,3 +2181,35 @@ p {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Seat number picker (setup): the chip is a button. */
+.seat-pick {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+
+.seat-pick .mini-chip {
+  width: 38px;
+  height: 38px;
+  font-size: 18px;
+  box-shadow: inset 0 0 0 1.5px var(--brass), 0 0 0 2px var(--bg), 0 0 0 3.5px var(--line-strong);
+}
+
+.seat-pick:active .mini-chip {
+  transform: scale(0.94);
+}
+
+.seat-grid {
+  gap: 10px 4px;
+}
+
+.seat-grid .chip__disc {
+  width: min(56px, 15vw);
+}

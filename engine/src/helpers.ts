@@ -62,13 +62,19 @@ export function kill(state: GameState, id: string, cause: DeathCause, phase: 'ni
   p.death = { cause, phase, number };
 }
 
-/** Next alive player after `seat`, clockwise (wraps around). */
-export function nextAliveAfter(state: GameState, seat: number): Player | undefined {
+/**
+ * Next alive player after `playerId` in seating order (clockwise around the table), wrapping around.
+ * Seat numbers are only labels and play no part in the order.
+ * `playerId = null` gives the first alive player in seating order.
+ */
+export function nextAliveAfter(state: GameState, playerId: string | null): Player | undefined {
   const n = state.players.length;
+  const start = playerId === null ? -1 : state.players.findIndex((p) => p.id === playerId);
   for (let k = 1; k <= n; k++) {
-    const s = ((seat - 1 + k) % n) + 1;
-    const p = state.players.find((x) => x.seat === s);
+    const p = state.players[(((start + k) % n) + n) % n];
     if (p?.alive) return p;
   }
   return undefined;
 }
+
+/** Neutral order for announcements (deaths, last words): by seat number, so it never hints at who killed whom. */

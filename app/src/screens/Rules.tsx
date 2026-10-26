@@ -81,7 +81,7 @@ export function RulesScreen() {
 
       <section className="folder">
         <span className="folder__tab">за игровым столом</span>
-        <p>Расставьте номера по часовой стрелке. Номер игрока остаётся тем же до конца партии.</p>
+        <p>Раздайте карточки с номерами — можно случайно. Номер — только метка игрока и не меняется до конца партии; речи идут по порядку посадки за столом.</p>
         <a className="btn btn--secondary btn--block" href={`${import.meta.env.BASE_URL}print-kit.html`} target="_blank" rel="noreferrer">Номера 1–20 и памятка для печати</a>
       </section>
     </main>

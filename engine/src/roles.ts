@@ -4,6 +4,8 @@ import type { Composition, Role, Team } from './types';
 
 export const MIN_PLAYERS = 5;
 export const MAX_PLAYERS = 20;
+/** Seat numbers come from table cards 1–20 and need not be consecutive. */
+export const MAX_SEAT = 20;
 
 export const ROLES: readonly Role[] = ['civilian', 'mafia', 'don', 'commissar', 'doctor', 'lover', 'maniac'];
 

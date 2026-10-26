@@ -12,6 +12,8 @@ export interface SavedGame {
 
 export interface LastSetup {
   names: string[];
+  /** Seat numbers (table cards 1–20), parallel to names. */
+  seats?: number[];
   count: number;
   preset: PresetName | 'custom';
   settings: Settings;
