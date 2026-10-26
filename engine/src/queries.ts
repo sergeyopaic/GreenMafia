@@ -2,9 +2,9 @@
 
 import { currentSpeaker, eligibleVoters, hasAlibi, nominationError } from './day';
 import { currentNight, findPlayer } from './helpers';
-import { commissarResult, currentStep, isStepBlocked, isStepFake, targetError } from './night';
+import { commissarResult, currentStep, donResult, isMafiaTeam, isStepBlocked, isStepFake, stepActors, targetError } from './night';
 import { ROLE_TEAM } from './roles';
-import type { CheckResult, Choice, GameState, NightStep, Player, Role, Team } from './types';
+import type { CheckResult, Choice, DonCheckResult, GameState, NightStep, Player, Role, Team } from './types';
 
 export interface TargetOption {
   player: Player;
@@ -17,8 +17,10 @@ export interface NightStepView {
   step: NightStep;
   /** Role is out of the game (or absent with a hidden setup): just wait. */
   fake: boolean;
-  /** The lover visited this role: the choice will not work. Host-only information. */
+  /** The lover visited this role: no choice this night, the step is skipped. */
   blocked: boolean;
+  /** Alive players who wake on this step (to highlight them). */
+  actors: Player[];
   choice: Choice | undefined;
   options: TargetOption[];
   index: number;
@@ -41,6 +43,7 @@ export function getNightStepView(state: GameState): NightStepView | null {
     step,
     fake,
     blocked: isStepBlocked(state, step),
+    actors: stepActors(state, step),
     choice: step === 'meeting' ? undefined : night.choices[step],
     options,
     index: state.phase.stepIndex,
@@ -52,6 +55,12 @@ export function getNightStepView(state: GameState): NightStepView | null {
 export function getCommissarResult(state: GameState): CheckResult | null {
   if (state.nights.length === 0) return null;
   return commissarResult(state, currentNight(state));
+}
+
+/** The answer to show the Don right after he chose (null if no choice yet). */
+export function getDonResult(state: GameState): DonCheckResult | null {
+  if (state.nights.length === 0) return null;
+  return donResult(state, currentNight(state));
 }
 
 export interface Identity {
@@ -101,11 +110,11 @@ export function getMorningReport(state: GameState): MorningReport | null {
   };
 }
 
-/** For the role card during the deal: mafia also sees the partners. */
+/** For the role card during the deal: the mafia team (mafiosi and the Don) sees each other. */
 export function getRoleCard(state: GameState, playerId: string): { role: Role; partners: Player[] } | null {
   const p = findPlayer(state, playerId);
   if (!p) return null;
-  const partners = p.role === 'mafia' ? state.players.filter((x) => x.role === 'mafia' && x.id !== p.id) : [];
+  const partners = isMafiaTeam(p.role) ? state.players.filter((x) => isMafiaTeam(x.role) && x.id !== p.id) : [];
   return { role: p.role, partners };
 }
 

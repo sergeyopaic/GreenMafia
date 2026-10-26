@@ -136,7 +136,8 @@ function CandidateRound() {
                   voted: mine && lastTap === p.id,
                   disabled: !eligibleIds.has(p.id) || !!elsewhere,
                   inert: !eligibleIds.has(p.id),
-                  tag: elsewhere ? `→${seat(byId(holder))}` : p.id === current.id ? 'кандидат' : !p.alive ? '' : !eligibleIds.has(p.id) ? 'алиби' : '',
+                  candidate: p.id === current.id,
+                  tag: elsewhere ? `→${seat(byId(holder))}` : mine ? 'голос учтён' : p.id === current.id ? 'кандидат' : !p.alive ? '' : !eligibleIds.has(p.id) ? 'алиби' : '',
                 };
               }}
               onPick={toggle}
@@ -254,7 +255,8 @@ function AllOutRound() {
             selected: yes.includes(p.id),
             disabled: !eligibleIds.has(p.id),
             inert: !eligibleIds.has(p.id),
-            tag: ph.candidates.includes(p.id) ? 'кандидат' : '',
+            candidate: ph.candidates.includes(p.id),
+            tag: yes.includes(p.id) ? 'за подъём' : !p.alive ? '' : !eligibleIds.has(p.id) ? 'не голосует' : '',
           })}
           onPick={(p) => {
             if (!eligibleIds.has(p.id)) return;

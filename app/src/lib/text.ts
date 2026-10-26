@@ -22,6 +22,7 @@ export const seats = (ps: Pick<Player, 'seat'>[]) => ps.map(seat).join(', ');
 export const ROLE_SHORT: Record<Role, string> = {
   civilian: 'Мирный',
   mafia: 'Мафия',
+  don: 'Дон',
   commissar: 'Комиссар',
   doctor: 'Доктор',
   lover: 'Любовница',
@@ -31,6 +32,7 @@ export const ROLE_SHORT: Record<Role, string> = {
 export const ROLE_PLURAL: Record<Role, string> = {
   civilian: 'мирных',
   mafia: 'мафии',
+  don: 'дон',
   commissar: 'комиссар',
   doctor: 'доктор',
   lover: 'любовница',
@@ -40,6 +42,7 @@ export const ROLE_PLURAL: Record<Role, string> = {
 export const ROLE_BLURB: Record<Role, string> = {
   civilian: 'Ночью спит. Днём ищет мафию и маньяка, выставляет и голосует.',
   mafia: 'Знает своих. Каждую ночь вместе с мафией выбирает одну жертву.',
+  don: 'Глава мафии: последнее слово в выборе жертвы за ним. Отдельно ищет комиссара.',
   commissar: 'Каждую ночь проверяет одного игрока: мафия или нет.',
   doctor: 'Каждую ночь лечит одного игрока. Не одного и того же две ночи подряд.',
   lover: 'Просыпается первой. Её клиент ночью ничего не может, а днём у него алиби.',
@@ -49,10 +52,11 @@ export const ROLE_BLURB: Record<Role, string> = {
 export const STEP_NAME: Record<NightStep, string> = {
   meeting: 'Знакомство',
   lover: 'Любовница',
-  mafia: 'Мафия',
-  maniac: 'Маньяк',
-  doctor: 'Доктор',
   commissar: 'Комиссар',
+  doctor: 'Доктор',
+  mafia: 'Мафия',
+  don: 'Дон',
+  maniac: 'Маньяк',
 };
 
 export const SCRIPT = {
@@ -61,18 +65,23 @@ export const SCRIPT = {
   meetingSleep: 'Мафия засыпает.',
   wake: {
     lover: 'Просыпается любовница. К кому вы пойдёте этой ночью?',
-    mafia: 'Просыпается мафия. Выберите жертву.',
-    maniac: 'Просыпается маньяк. Кто не увидит рассвета?',
-    doctor: 'Просыпается доктор. Кого вы спасёте этой ночью?',
     commissar: 'Просыпается комиссар. Кого вы проверите?',
+    doctor: 'Просыпается доктор. Кого вы спасёте этой ночью?',
+    mafia: 'Просыпается мафия. Выберите жертву.',
+    don: 'Просыпается дон. Кого вы проверите — не комиссар ли он?',
+    maniac: 'Просыпается маньяк. Кто не увидит рассвета?',
   } satisfies Record<ActionStep, string>,
+  /** Mafia step when the Don is in the game. */
+  mafiaWithDon: 'Просыпаются мафия и дон. Выберите жертву — последнее слово за доном.',
   sleep: {
     lover: 'Любовница засыпает.',
-    mafia: 'Мафия сделала выбор и засыпает.',
-    maniac: 'Маньяк засыпает.',
-    doctor: 'Доктор засыпает.',
     commissar: 'Комиссар засыпает.',
+    doctor: 'Доктор засыпает.',
+    mafia: 'Мафия сделала выбор и засыпает.',
+    don: 'Дон засыпает.',
+    maniac: 'Маньяк засыпает.',
   } satisfies Record<ActionStep, string>,
+  meetingWithDon: 'Просыпаются мафия и дон. Посмотрите друг на друга и запомните своих.',
   morningStart: 'Город просыпается.',
   deathsNone: 'Этой ночью никто не погиб.',
   deathsOne: (p: Player) => `Этой ночью нас покинул игрок ${who(p)}.`,

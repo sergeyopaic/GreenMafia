@@ -5,14 +5,15 @@ import type { Composition, Role, Team } from './types';
 export const MIN_PLAYERS = 5;
 export const MAX_PLAYERS = 20;
 
-export const ROLES: readonly Role[] = ['civilian', 'mafia', 'commissar', 'doctor', 'lover', 'maniac'];
+export const ROLES: readonly Role[] = ['civilian', 'mafia', 'don', 'commissar', 'doctor', 'lover', 'maniac'];
 
 /** Roles that can appear at most once. */
-export const SINGLE_ROLES: readonly Role[] = ['commissar', 'doctor', 'lover', 'maniac'];
+export const SINGLE_ROLES: readonly Role[] = ['don', 'commissar', 'doctor', 'lover', 'maniac'];
 
 export const ROLE_TEAM: Record<Role, Team> = {
   civilian: 'town',
   mafia: 'mafia',
+  don: 'mafia',
   commissar: 'town',
   doctor: 'town',
   lover: 'town',
@@ -22,6 +23,7 @@ export const ROLE_TEAM: Record<Role, Team> = {
 export const ROLE_NAME: Record<Role, string> = {
   civilian: 'Мирный житель',
   mafia: 'Мафия',
+  don: 'Дон мафии',
   commissar: 'Комиссар',
   doctor: 'Доктор',
   lover: 'Любовница',
@@ -34,7 +36,8 @@ export const TEAM_NAME: Record<Team, string> = {
   maniac: 'Маньяк',
 };
 
-// [mafia, commissar, doctor, lover, maniac]; the rest are civilians. Table from §5.1.
+// [mafia team incl. the Don, commissar, doctor, lover, maniac]; the rest are civilians. Table from §5.1.
+// The Don is in the game as soon as the mafia team has two or more members.
 const TABLE: Record<number, [number, number, number, number, number]> = {
   5: [1, 1, 0, 0, 0],
   6: [2, 1, 0, 0, 0],
@@ -55,7 +58,7 @@ const TABLE: Record<number, [number, number, number, number, number]> = {
 };
 
 export function emptyComposition(): Composition {
-  return { civilian: 0, mafia: 0, commissar: 0, doctor: 0, lover: 0, maniac: 0 };
+  return { civilian: 0, mafia: 0, don: 0, commissar: 0, doctor: 0, lover: 0, maniac: 0 };
 }
 
 export function compositionTotal(c: Composition): number {
@@ -67,14 +70,16 @@ export function recommendedComposition(players: number): Composition {
   if (!row) {
     throw new RangeError(`Игроков должно быть от ${MIN_PLAYERS} до ${MAX_PLAYERS}`);
   }
-  const [mafia, commissar, doctor, lover, maniac] = row;
+  const [team, commissar, doctor, lover, maniac] = row;
+  const don = team >= 2 ? 1 : 0;
   return {
-    mafia,
+    mafia: team - don,
+    don,
     commissar,
     doctor,
     lover,
     maniac,
-    civilian: players - mafia - commissar - doctor - lover - maniac,
+    civilian: players - team - commissar - doctor - lover - maniac,
   };
 }
 
@@ -108,8 +113,8 @@ export function validateComposition(players: number, c: Composition): Compositio
       message: `Ролей ${compositionTotal(c)}, а игроков ${players}`,
     });
   }
-  if (c.mafia < 1) {
-    errors.push({ code: 'composition.noMafia', message: 'Нужна хотя бы одна мафия' });
+  if (c.mafia + c.don < 1) {
+    errors.push({ code: 'composition.noMafia', message: 'Нужна хотя бы одна мафия: мафиози или дон' });
   }
   for (const r of SINGLE_ROLES) {
     if (c[r] > 1) {
@@ -117,7 +122,7 @@ export function validateComposition(players: number, c: Composition): Compositio
     }
   }
   const town = c.civilian + c.commissar + c.doctor + c.lover;
-  if (c.mafia + c.maniac >= town) {
+  if (c.mafia + c.don + c.maniac >= town) {
     errors.push({
       code: 'composition.startWin',
       message: 'Мафии и маньяка вместе должно быть меньше, чем мирных — иначе игра закончится, не начавшись',
@@ -138,7 +143,7 @@ export function balanceHint(players: number, c: Composition): 'town' | 'balanced
   const row = TABLE[players];
   if (!row) return 'balanced';
   const rec = recommendedComposition(players);
-  const evil = (x: Composition) => x.mafia + 0.5 * x.maniac;
+  const evil = (x: Composition) => x.mafia + x.don + 0.5 * x.maniac;
   const helpers = (x: Composition) => 0.5 * (x.commissar + x.doctor + x.lover);
   const delta = evil(c) - helpers(c) - (evil(rec) - helpers(rec));
   if (delta >= 1) return 'mafia';

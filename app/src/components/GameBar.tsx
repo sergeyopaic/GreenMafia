@@ -4,6 +4,8 @@ import { phaseTitle } from '../lib/phase';
 import { ROLE_NAME } from '../lib/text';
 import { useApp, useGame } from '../store';
 import { MiniChip } from './Chip';
+import { RoleBrief } from './RoleBrief';
+import { firstNightBrief } from '../lib/roleBrief';
 import {
   IconBan,
   IconDoor,
@@ -24,6 +26,7 @@ import { Confirm, PlayerPicker, Sheet } from './Sheet';
 type Dialog =
   | null
   | 'menu'
+  | 'rules'
   | 'undo'
   | 'draw'
   | 'abort'
@@ -138,6 +141,7 @@ export function GameBar() {
       {dialog === 'menu' && (
         <Sheet title="Меню ведущего" onClose={() => setDialog(null)}>
           <div className="list">
+            <button type="button" className="sheet__item" onClick={() => setDialog('rules')}>Правила этой партии</button>
             {!over && !inReveal && (
               <>
                 <button type="button" className="sheet__item" onClick={() => setDialog({ pick: 'left' })}>
@@ -184,6 +188,19 @@ export function GameBar() {
           }}
           onCancel={() => setDialog(null)}
         />
+      )}
+
+      {dialog === 'rules' && (
+        <Sheet title="Правила этой партии" onClose={() => setDialog(null)}>
+          <p>{firstNightBrief(state.settings)}</p>
+          {Object.entries(state.composition).filter(([, count]) => count > 0).map(([role]) => (
+            <section key={role} className="host-role-brief">
+              <h3>{ROLE_NAME[role as keyof typeof ROLE_NAME]}</h3>
+              <RoleBrief role={role as keyof typeof ROLE_NAME} settings={state.settings} />
+            </section>
+          ))}
+          <button type="button" className="btn btn--secondary" onClick={() => setDialog('menu')}>Назад в меню</button>
+        </Sheet>
       )}
 
       {dialog === 'draw' && (

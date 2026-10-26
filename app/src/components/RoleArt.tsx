@@ -2,17 +2,20 @@ import type { Role } from '@greenmafia/engine';
 import { roleArt } from '../lib/assets';
 import { RoleIcon } from './icons';
 
+// Equalize the reviewed set's average rendered luminance without altering source art.
+const BRIGHTNESS: Record<Role, number> = { civilian: 0.70, mafia: 0.91, don: 0.84, commissar: 0.75, doctor: 0.71, lover: 0.74, maniac: 1 };
+
 /** Card artwork from assets/roles/<role>.*, or a labelled placeholder until it is drawn. */
 export function RoleArt({ role }: { role: Role | 'back' }) {
   const url = roleArt(role);
-  if (url) return <img src={url} alt="" draggable={false} />;
+  if (url) return <img src={url} alt="" draggable={false} style={role === 'back' ? undefined : { filter: `brightness(${BRIGHTNESS[role]})` }} />;
   return <RoleArtPlaceholder role={role} />;
 }
 
 function RoleArtPlaceholder({ role }: { role: Role | 'back' }) {
   const id = `hatch-${role}`;
   return (
-    <svg viewBox="0 0 200 260" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Заглушка арта роли">
+    <svg viewBox="0 0 200 260" preserveAspectRatio="xMidYMin meet" role="img" aria-label="Заглушка арта роли">
       <defs>
         <pattern id={id} width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
           <rect width="8" height="8" fill="#0f2e21" />

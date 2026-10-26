@@ -1,4 +1,4 @@
-import { type ActionStep, type GameState, type NightRecord } from '@greenmafia/engine';
+import { type ActionStep, type GameState, type NightRecord, isMafiaTeam } from '@greenmafia/engine';
 import { DEATH_CAUSE, STEP_NAME, seat, verdictText } from '../lib/text';
 
 /** §9.5 — night by night, day by day. */
@@ -18,16 +18,20 @@ export function Chronicle({ state }: { state: GameState }) {
     for (const step of night.steps) {
       if (step === 'meeting') continue;
       const c = night.choices[step as ActionStep];
+      const client = byId(night.blocked);
+      const clientActsHere =
+        step !== 'lover' && !!client && (step === 'mafia' ? isMafiaTeam(client.role) : client.role === step);
       let text: string;
-      if (c === undefined) text = 'роль выбыла';
+      if (c === undefined) text = clientActsHere ? 'у любовницы — хода нет' : 'роль выбыла';
       else if (c === null) text = step === 'mafia' ? 'промах' : 'пропуск';
       else text = label(c);
-      if (step !== 'lover' && night.blocked && state.players.some((p) => p.id === night.blocked && (p.role === step))) {
-        text += ' · заблокирован';
-      }
+      if (step === 'mafia' && c !== undefined && clientActsHere) text += ` · ${seat(client!)} у любовницы`;
       if (step === 'doctor' && c && night.saved.includes(c)) text += ' · спас';
       if (step === 'commissar' && night.checkResult) {
         text += ` · ${night.checkResult === 'mafia' ? 'мафия' : night.checkResult === 'notMafia' ? 'не мафия' : 'нет ответа'}`;
+      }
+      if (step === 'don' && night.donResult) {
+        text += ` · ${night.donResult === 'commissar' ? 'комиссар' : night.donResult === 'notCommissar' ? 'не комиссар' : 'нет ответа'}`;
       }
       rows.push([STEP_NAME[step], text]);
     }

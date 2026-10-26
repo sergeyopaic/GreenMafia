@@ -121,6 +121,14 @@ const ROLE_PATHS: Record<Role, ReactElement> = {
       <path d="M6 12.5c3.5 1 8.5 1 12 0" />
     </>
   ),
+  don: (
+    <>
+      <path d="M2.5 17c4 2.4 15 2.4 19 0" />
+      <path d="M5.5 16.5c0-4.2 1.2-7 3.5-7 1.2 0 2 .8 3 .8s1.8-.8 3-.8c2.3 0 3.5 2.8 3.5 7" />
+      <path d="M6 14.2c3.5.9 8.5.9 12 0" />
+      <path d="M8.5 6.5 10 3.5l2 2 2-2 1.5 3z" />
+    </>
+  ),
   commissar: (
     <>
       <circle cx="12" cy="12" r="9" />

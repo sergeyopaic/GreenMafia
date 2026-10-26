@@ -20,31 +20,26 @@ export function asset(pathNoExt: string, kind: 'image' | 'audio' = 'image'): str
   }
   return null;
 }
-
 export const roleArt = (role: Role | 'back') => asset(`roles/${role}`);
 export const roleIcon = (role: Role) => asset(`icons/roles/${role}`);
 
-export type StampKind = 'killed' | 'exiled' | 'alibi' | 'case-closed' | 'checked-mafia' | 'checked-clean' | 'no-answer';
+export type StampKind =
+  | 'killed'
+  | 'exiled'
+  | 'alibi'
+  | 'case-closed'
+  | 'checked-mafia'
+  | 'checked-clean'
+  | 'no-answer'
+  | 'checked-commissar'
+  | 'checked-not-commissar';
 export const stampImage = (kind: StampKind) => asset(`stamps/${kind}`);
 
 /** Puts texture URLs into CSS variables; missing textures fall back to the CSS noise. */
 export function applyTextures(): void {
   const root = document.documentElement.style;
-  for (const name of ['paper', 'felt', 'cardboard']) {
+  for (const name of ['paper', 'cardboard']) {
     const url = asset(`textures/${name}`);
     root.setProperty(`--tex-${name}`, url ? `url("${url}")` : 'none');
   }
 }
-
-/** For the rules screen: which assets are in place. */
-export const EXPECTED_ASSETS: { path: string; what: string }[] = [
-  ...(['civilian', 'mafia', 'commissar', 'doctor', 'lover', 'maniac', 'back'] as const).map((r) => ({
-    path: `roles/${r}`,
-    what: 'Арт карты 1024×1536',
-  })),
-  { path: 'stamps/killed', what: 'Штамп «УБИТ»' },
-  { path: 'stamps/exiled', what: 'Штамп «ИЗГНАН»' },
-  { path: 'stamps/case-closed', what: 'Штамп «ДЕЛО ЗАКРЫТО»' },
-  { path: 'textures/paper', what: 'Бумага, бесшовная' },
-  { path: 'textures/felt', what: 'Сукно, бесшовное' },
-];

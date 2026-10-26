@@ -1,9 +1,11 @@
 import { getMorningReport } from '@greenmafia/engine';
+import { useEffect } from 'react';
 import { Chip } from '../../components/Chip';
 import { IdentityLine } from '../../components/Identity';
 import { Stamp } from '../../components/Stamp';
 import { TypeLine } from '../../components/TypeLine';
 import { SCRIPT, seat } from '../../lib/text';
+import { play } from '../../lib/sound';
 import { useApp, useGame } from '../../store';
 
 /** §7.5, §14.5 — the morning paper. */
@@ -11,6 +13,7 @@ export function MorningScreen() {
   const state = useGame();
   const dispatch = useApp((s) => s.dispatch);
   const report = getMorningReport(state);
+  useEffect(() => { play('morning', 0.7); }, []);
   if (!report) return null;
   const deaths = report.deaths.map((d) => d.player);
 

@@ -38,7 +38,7 @@ function randomEvent(state: GameState, rng: () => number): GameEvent {
   switch (ph.t) {
     case 'night': {
       const view = getNightStepView(state);
-      if (!view || view.step === 'meeting' || view.fake || view.choice !== undefined) return { type: 'Proceed' };
+      if (!view || view.step === 'meeting' || view.fake || view.blocked || view.choice !== undefined) return { type: 'Proceed' };
       const allowed = view.options.filter((o) => o.allowed);
       if (allowed.length === 0 || rng() < 0.15) return { type: 'NightChoose', target: null };
       return { type: 'NightChoose', target: pick(rng, allowed).player.id };

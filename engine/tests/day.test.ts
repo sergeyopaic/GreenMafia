@@ -244,8 +244,14 @@ describe('день: очерёдность речей', () => {
     expect(g.state.days[1]?.firstSpeaker).toBe(id(1));
   });
 
-  it('ночные жертвы говорят последнее слово до обсуждения', () => {
+  it('по умолчанию у ночных жертв последнего слова нет', () => {
     let g = night(setup(BASE, FULL), { mafia: 9, maniac: 7 });
+    g = proceed(g);
+    expect(g.state.phase).toMatchObject({ t: 'discussion' });
+  });
+
+  it('lastWordNight: ночные жертвы говорят последнее слово до обсуждения', () => {
+    let g = night(setup(BASE, { ...FULL, lastWordNight: true }), { mafia: 9, maniac: 7 });
     g = proceed(g);
     expect(g.state.phase).toMatchObject({ t: 'lastWords', queue: [id(7), id(9)], then: 'discussion' });
   });

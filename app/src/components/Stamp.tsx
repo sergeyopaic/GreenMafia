@@ -10,6 +10,8 @@ const TEXT: Record<StampKind, string> = {
   'checked-mafia': 'Мафия',
   'checked-clean': 'Не мафия',
   'no-answer': 'Нет ответа',
+  'checked-commissar': 'Комиссар',
+  'checked-not-commissar': 'Не комиссар',
 };
 
 /** Rubber stamp: image from assets/stamps/<kind>.* or a typeset stamp. */
@@ -19,23 +21,25 @@ export function Stamp({
   rotate = -7,
   animate = true,
   text,
+  silent = false,
 }: {
   kind: StampKind;
   big?: boolean;
   rotate?: number;
   animate?: boolean;
   text?: string;
+  silent?: boolean;
 }) {
   useEffect(() => {
-    if (animate) play('stamp', 0.6);
-  }, [animate]);
+    if (animate && !silent) play('stamp', 0.6);
+  }, [animate, silent]);
 
   const url = stampImage(kind);
   const style = { '--stamp-rot': `${rotate}deg` } as CSSProperties;
   if (url) {
     return <img className={`stamp-img${animate ? ' slam' : ''}`} style={style} src={url} alt={TEXT[kind]} />;
   }
-  const ok = kind === 'checked-clean' || kind === 'alibi' || kind === 'no-answer';
+  const ok = kind === 'checked-clean' || kind === 'alibi' || kind === 'no-answer' || kind === 'checked-not-commissar';
   return (
     <span className={`stamp${big ? ' stamp--big' : ''}${ok ? ' stamp--ok' : ''}${animate ? ' slam' : ''}`} style={style}>
       {text ?? TEXT[kind]}

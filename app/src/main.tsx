@@ -16,8 +16,10 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import { applyTextures } from './lib/assets';
+import { initSound } from './lib/sound';
 
 applyTextures();
+initSound();
 registerSW({ immediate: true });
 
 const root = document.getElementById('root');

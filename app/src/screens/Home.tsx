@@ -38,10 +38,10 @@ export function HomeScreen() {
           ))}
         </div>
         <h1 className="sign__name">
+          <img className="brand-mark" src={`${import.meta.env.BASE_URL}assets/brand/logo.svg`} alt="" />
           Green
           <em>Mafia</em>
         </h1>
-        <p className="sign__tag">суфлёр · блокнот · судья</p>
       </div>
 
       <nav className="home__menu">

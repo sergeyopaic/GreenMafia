@@ -11,6 +11,7 @@ import {
   SINGLE_ROLES,
   type Settings,
   TEAM_NAME,
+  emptyComposition,
   recommendedComposition,
   validateComposition,
 } from '@greenmafia/engine';
@@ -29,8 +30,21 @@ function resize(names: string[], n: number): string[] {
 }
 
 function withCivilians(c: Composition, n: number): Composition {
-  const others = c.mafia + c.commissar + c.doctor + c.lover + c.maniac;
+  const others = c.mafia + c.don + c.commissar + c.doctor + c.lover + c.maniac;
   return { ...c, civilian: n - others };
+}
+
+/**
+ * Civilians are never stored: they are always "players minus special roles".
+ * Missing roles (e.g. a setup saved before the Don existed) count as zero.
+ */
+function normalizeComposition(c: Partial<Composition> | undefined, n: number): Composition {
+  const base = emptyComposition();
+  for (const r of ROLES) {
+    const v = c?.[r];
+    base[r] = typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : 0;
+  }
+  return withCivilians(base, n);
 }
 
 function samePreset(s: Settings): PresetName | 'custom' {
@@ -46,7 +60,8 @@ export function SetupScreen() {
   const [step, setStep] = useState<Step>(0);
   const [count, setCount] = useState(10);
   const [names, setNames] = useState<string[]>(resize([], 10));
-  const [comp, setComp] = useState<Composition>(recommendedComposition(10));
+  const [compRaw, setComp] = useState<Composition>(recommendedComposition(10));
+  const comp = useMemo(() => normalizeComposition(compRaw, count), [compRaw, count]);
   const [settings, setSettings] = useState<Settings>(CLASSIC_SETTINGS);
   const [dealing, setDealing] = useState<'app' | 'cards'>('app');
   const [cardRoles, setCardRoles] = useState<(Role | '')[]>([]);
@@ -58,7 +73,8 @@ export function SetupScreen() {
         setCount(n);
         setNames(resize(last.names, n));
         setSettings({ ...CLASSIC_SETTINGS, ...last.settings, timers: { ...CLASSIC_SETTINGS.timers, ...last.settings.timers } });
-        setComp(last.composition && validateComposition(n, last.composition).errors.length === 0 ? last.composition : recommendedComposition(n));
+        const saved = normalizeComposition(last.composition, n);
+        setComp(validateComposition(n, saved).errors.length === 0 ? saved : recommendedComposition(n));
         setDealing(last.dealing);
       }
       setLoaded(true);
@@ -247,7 +263,7 @@ function CompositionStep({
   onComp: (c: Composition) => void;
   check: ReturnType<typeof validateComposition>;
 }) {
-  const editable: Role[] = ['mafia', 'commissar', 'doctor', 'lover', 'maniac'];
+  const editable: Role[] = ['mafia', 'don', 'commissar', 'doctor', 'lover', 'maniac'];
   const pin = check.balance === 'town' ? 18 : check.balance === 'mafia' ? 82 : 50;
   const isRecommended = JSON.stringify(comp) === JSON.stringify(recommendedComposition(count));
 
@@ -257,7 +273,8 @@ function CompositionStep({
         <span className="folder__tab">кто за столом</span>
         {[...editable, 'civilian' as Role].map((role) => {
           const max = (SINGLE_ROLES as readonly Role[]).includes(role) ? 1 : 6;
-          const min = role === 'mafia' ? 1 : 0;
+          // At least one member of the mafia team: a mafioso or the Don.
+          const min = role === 'mafia' ? (comp.don > 0 ? 0 : 1) : role === 'don' ? (comp.mafia > 0 ? 0 : 1) : 0;
           return (
             <div className="role-line" key={role}>
               <RoleIcon role={role} className="role-line__icon" />

@@ -126,7 +126,7 @@ describe('состав', () => {
 
   it('ошибки состава', () => {
     const c = recommendedComposition(10);
-    expect(validateComposition(10, { ...c, mafia: 0, civilian: c.civilian + 3 }).errors.map((e) => e.code)).toContain(
+    expect(validateComposition(10, { ...c, mafia: 0, don: 0, civilian: c.civilian + c.mafia + c.don }).errors.map((e) => e.code)).toContain(
       'composition.noMafia',
     );
     expect(validateComposition(10, { ...c, doctor: 2, civilian: c.civilian - 1 }).errors.map((e) => e.code)).toContain(
@@ -135,7 +135,7 @@ describe('состав', () => {
     expect(validateComposition(10, { ...c, civilian: c.civilian + 1 }).errors.map((e) => e.code)).toContain(
       'composition.total',
     );
-    expect(validateComposition(6, { mafia: 3, commissar: 0, doctor: 0, lover: 0, maniac: 0, civilian: 3 }).errors.map((e) => e.code)).toContain(
+    expect(validateComposition(6, { mafia: 3, don: 0, commissar: 0, doctor: 0, lover: 0, maniac: 0, civilian: 3 }).errors.map((e) => e.code)).toContain(
       'composition.startWin',
     );
     expect(validateComposition(21, recommendedComposition(20)).errors.map((e) => e.code)).toContain('players.range');

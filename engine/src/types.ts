@@ -2,7 +2,7 @@
 
 import type { Settings } from './settings';
 
-export type Role = 'civilian' | 'mafia' | 'commissar' | 'doctor' | 'lover' | 'maniac';
+export type Role = 'civilian' | 'mafia' | 'don' | 'commissar' | 'doctor' | 'lover' | 'maniac';
 export type Team = 'town' | 'mafia' | 'maniac';
 
 /** Number of players per role. */
@@ -30,10 +30,13 @@ export interface Player {
   skipNextSpeech: boolean;
 }
 
-export type ActionStep = 'lover' | 'mafia' | 'maniac' | 'doctor' | 'commissar';
+export type ActionStep = 'lover' | 'commissar' | 'doctor' | 'mafia' | 'don' | 'maniac';
 export type NightStep = 'meeting' | ActionStep;
 
 export type CheckResult = 'mafia' | 'notMafia' | 'noAnswer';
+
+/** What the Don learns: is the checked player the commissar? */
+export type DonCheckResult = 'commissar' | 'notCommissar' | 'noAnswer';
 
 /**
  * A choice is a player id, `null` for "skip / miss",
@@ -50,6 +53,7 @@ export interface NightRecord {
   /** The lover's client whose night action was blocked. */
   blocked: string | null;
   checkResult: CheckResult | null;
+  donResult: DonCheckResult | null;
   /** Sorted by seat. */
   deaths: { playerId: string; cause: DeathCause }[];
   /** Attacked but survived (healed or protected). For the chronicle. */

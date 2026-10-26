@@ -9,7 +9,7 @@ import {
   undo as engineUndo,
 } from '@greenmafia/engine';
 import { create } from 'zustand';
-import { setSoundEnabled } from './lib/sound';
+import { setSoundContext, setSoundEnabled } from './lib/sound';
 import {
   type SavedGame,
   clearCurrent,
@@ -228,6 +228,10 @@ export const useApp = create<AppState>((set, get) => ({
     set({ sound });
   },
 }));
+
+useApp.subscribe((state) => {
+  setSoundContext(state.screen.name === 'game' ? state.game?.state.phase.t ?? null : null, state.paused);
+});
 
 /** The current game state; only call inside the game screens. */
 export function useGame() {

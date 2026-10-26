@@ -2,8 +2,9 @@ import { ROLE_TEAM, getRoleCard } from '@greenmafia/engine';
 import { useEffect, useState } from 'react';
 import { Chip } from '../../components/Chip';
 import { RoleArt } from '../../components/RoleArt';
+import { RoleBrief } from '../../components/RoleBrief';
 import { play } from '../../lib/sound';
-import { ROLE_NAME, TEAM_NAME, seats } from '../../lib/text';
+import { ROLE_NAME, TEAM_NAME } from '../../lib/text';
 import { useApp, useGame } from '../../store';
 
 /** §14.3 — the phone goes around; each player holds the envelope to see their role. */
@@ -14,12 +15,14 @@ export function RevealScreen() {
   const [stage, setStage] = useState<'pass' | 'open'>('pass');
   const [holding, setHolding] = useState(false);
   const [seen, setSeen] = useState(false);
+  const [detail, setDetail] = useState(false);
 
   const index = ph?.index ?? 0;
   useEffect(() => {
     setStage('pass');
     setSeen(false);
     setHolding(false);
+    setDetail(false);
   }, [index]);
 
   useEffect(() => {
@@ -28,10 +31,12 @@ export function RevealScreen() {
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
     window.addEventListener('blur', up);
+    document.addEventListener('visibilitychange', up);
     return () => {
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
       window.removeEventListener('blur', up);
+      document.removeEventListener('visibilitychange', up);
     };
   }, [holding]);
 
@@ -61,34 +66,35 @@ export function RevealScreen() {
 
   const open = holding;
   return (
-    <main className="screen" style={{ alignItems: 'center' }}>
+    <main className="screen reveal-screen" style={{ alignItems: 'center' }}>
       <div className="eyebrow center">
         №{player.seat}, {player.name}
       </div>
       <div
-        className={`envelope${open ? ' is-open' : ''}`}
+        className={`envelope${open ? ' is-open' : ''}${detail ? ' envelope--brief' : ''}`}
         onPointerDown={(e) => {
+          if (detail && holding) return;
           e.preventDefault();
           if (!holding) play('envelope', 0.5);
           setHolding(true);
           setSeen(true);
         }}
         onContextMenu={(e) => e.preventDefault()}
-        role="button"
-        aria-label="Удерживайте, чтобы увидеть роль"
       >
         <div className="envelope__card" aria-hidden={!open}>
           {open && card && (
             <div className="role-card">
-              <div className="role-card__art">
+              {!detail && <div className="role-card__art">
                 <RoleArt role={card.role} />
-              </div>
+              </div>}
               <div className="role-card__foot">
                 <div className="role-card__name">{ROLE_NAME[card.role]}</div>
                 <div className="role-card__team">команда: {TEAM_NAME[ROLE_TEAM[card.role]]}</div>
+                {detail && <RoleBrief role={card.role} settings={state.settings} firstNight />}
                 {card.partners.length > 0 && (
                   <div className="role-card__partners">
-                    Ваши сообщники: <b>{seats(card.partners)}</b>
+                    Ваши сообщники:{' '}
+                    <b>{card.partners.map((p) => `№${p.seat}${p.role === 'don' ? ' (дон)' : ''}`).join(', ')}</b>
                     <div className="list__sub">{card.partners.map((p) => p.name).join(', ')}</div>
                   </div>
                 )}
@@ -97,13 +103,37 @@ export function RevealScreen() {
           )}
         </div>
         <div className="envelope__body">
+          <RoleArt role="back" />
           <div className="envelope__flap" />
           <div className="envelope__seal">GM</div>
           <div className="envelope__hint">удерживайте, чтобы вскрыть</div>
         </div>
       </div>
+      <div className="seg reveal-tabs" role="group" aria-label="Вид карточки">
+        <button type="button" aria-pressed={!detail} onClick={() => setDetail(false)}>Карта</button>
+        <button type="button" aria-pressed={detail} onClick={() => setDetail(true)}>Памятка</button>
+      </div>
+      <button
+        type="button"
+        className="btn btn--secondary btn--block reveal-hold"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          if (!holding) play('envelope', 0.5);
+          setHolding(true);
+          setSeen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== ' ' && e.key !== 'Enter') return;
+          e.preventDefault();
+          setHolding(true);
+          setSeen(true);
+        }}
+        onKeyUp={() => setHolding(false)}
+        onBlur={() => setHolding(false)}
+        onContextMenu={(e) => e.preventDefault()}
+      >Удерживайте, чтобы {detail ? 'прочитать памятку' : 'увидеть роль'}</button>
       <p className="muted type center" style={{ fontSize: 14 }}>
-        Отпустите — и карта спрячется.
+        {detail ? 'Удерживайте кнопку и прокручивайте памятку. Отпустите — роль спрячется.' : 'Отпустите — и карта спрячется.'}
       </p>
       <div className="actions" style={{ width: '100%' }}>
         <button

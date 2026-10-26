@@ -47,19 +47,17 @@ describe('ночь: любовница', () => {
     expect(g.state.nights[0]?.blocked).toBe(id(4));
   });
 
-  it('7. любовница у комиссара: «Нет ответа»', () => {
+  it('7. любовница у комиссара: выбора нет, ход пропускается, «Нет ответа»', () => {
     let g = setup(BASE, FULL);
     g = act(g, { type: 'NightChoose', target: id(3) });
-    g = proceed(g); // lover → mafia
-    g = proceed(act(g, { type: 'NightChoose', target: null })); // mafia miss
-    g = proceed(act(g, { type: 'NightChoose', target: null })); // maniac skip
-    g = proceed(act(g, { type: 'NightChoose', target: null })); // doctor skip
+    g = proceed(g); // lover → commissar
     expect(getNightStepView(g.state)?.step).toBe('commissar');
     expect(getNightStepView(g.state)?.blocked).toBe(true);
-    g = act(g, { type: 'NightChoose', target: id(1) });
+    expectError(g, { type: 'NightChoose', target: id(1) }, 'night.blocked');
     expect(getCommissarResult(g.state)).toBe('noAnswer');
-    g = proceed(g);
+    g = night(proceed(g)); // skipping without a choice is allowed
     expect(g.state.nights[0]?.checkResult).toBe('noAnswer');
+    expect(g.state.nights[0]?.choices.commissar).toBeUndefined();
   });
 
   it('8. любовница у единственного живого мафиози: убийства нет', () => {
@@ -104,8 +102,8 @@ describe('ночь: любовница', () => {
     expect(deathsSeats(g)).toEqual([]);
   });
 
-  it('27. любовница погибла, но её клиент получает алиби', () => {
-    let g = night(setup(BASE, FULL), { lover: 7, mafia: 5 });
+  it('27. любовница погибла, но её клиент получает алиби (без смерти по связи)', () => {
+    let g = night(setup(BASE, { ...FULL, loverDeathLink: false }), { lover: 7, mafia: 5 });
     expect(deathsSeats(g)).toEqual([5]);
     expect(getMorningReport(g.state)?.alibi?.seat).toBe(7);
     g = toDiscussion(g);
@@ -180,9 +178,18 @@ describe('ночь: доктор', () => {
     expect(g.state.memory.doctorSelfHeals).toBe(2);
   });
 
-  it('19. заблокированный доктор, выбравший себя, использует самолечение', () => {
-    const g = night(setup(BASE, FULL), { lover: 4, doctor: 4, mafia: 4 });
-    expect(g.state.memory.doctorSelfHeals).toBe(1);
+  it('19. заблокированный доктор не делает ход и не тратит ограничения', () => {
+    let g = proceed(act(setup(BASE, FULL), { type: 'NightChoose', target: id(4) }));
+    while (getNightStepView(g.state)?.step !== 'doctor') {
+      const v = getNightStepView(g.state);
+      if (v && !v.fake && !v.blocked) g = act(g, { type: 'NightChoose', target: null });
+      g = proceed(g);
+    }
+    expect(getNightStepView(g.state)?.blocked).toBe(true);
+    expectError(g, { type: 'NightChoose', target: id(4) }, 'night.blocked');
+    g = night(proceed(g), { mafia: 4 });
+    expect(g.state.memory.doctorSelfHeals).toBe(0);
+    expect(g.state.memory.lastDoctorTarget).toBeNull();
     expect(alive(g, 4)).toBe(false);
   });
 });
@@ -221,8 +228,7 @@ describe('ночь: комиссар', () => {
 describe('ночь: валидация и пробуждения', () => {
   it('23. мафия не может выбрать мафиози', () => {
     let g = setup(BASE, FULL);
-    g = proceed(act(g, { type: 'NightChoose', target: null })); // lover
-    expect(getNightStepView(g.state)?.step).toBe('mafia');
+    while (getNightStepView(g.state)?.step !== 'mafia') g = proceed(act(g, { type: 'NightChoose', target: null }));
     expectError(g, { type: 'NightChoose', target: id(2) }, 'night.target');
   });
 
@@ -234,7 +240,7 @@ describe('ночь: валидация и пробуждения', () => {
   it('нельзя выбрать выбывшего', () => {
     let g = night(setup(BASE, FULL), { mafia: 7 });
     g = skipDay(g);
-    g = proceed(act(g, { type: 'NightChoose', target: null })); // lover
+    while (getNightStepView(g.state)?.step !== 'mafia') g = proceed(act(g, { type: 'NightChoose', target: null }));
     expectError(g, { type: 'NightChoose', target: id(7) }, 'night.target');
   });
 
@@ -254,23 +260,23 @@ describe('ночь: валидация и пробуждения', () => {
     expect(view?.options.every((o) => !o.allowed)).toBe(true);
     expectError(g, { type: 'NightChoose', target: id(1) }, 'night.fake');
     g = proceed(g);
-    expect(g.state.phase.t).toBe('morning');
+    expect(getNightStepView(g.state)?.step).toBe('doctor');
   });
 
   it('fakeWakes = нет: шаг выбывшей роли пропускается', () => {
     let g = night(setup(BASE, { ...FULL, fakeWakes: false }), { mafia: 3 });
     g = skipDay(g);
-    expect(g.state.nights[1]?.steps).toEqual(['lover', 'mafia', 'maniac', 'doctor']);
+    expect(g.state.nights[1]?.steps).toEqual(['lover', 'doctor', 'mafia', 'maniac']);
   });
 
   it('открытый состав: отсутствующих ролей нет в ночи', () => {
     const g = setup(['mafia', 'commissar', 'civilian', 'civilian', 'civilian'], FULL);
-    expect(g.state.nights[0]?.steps).toEqual(['mafia', 'commissar']);
+    expect(g.state.nights[0]?.steps).toEqual(['commissar', 'mafia']);
   });
 
   it('скрытый состав: все роли будятся, отсутствующие — фиктивно', () => {
     const g = setup(['mafia', 'commissar', 'civilian', 'civilian', 'civilian'], { ...FULL, openSetup: false });
-    expect(g.state.nights[0]?.steps).toEqual(['lover', 'mafia', 'maniac', 'doctor', 'commissar']);
+    expect(g.state.nights[0]?.steps).toEqual(['lover', 'commissar', 'doctor', 'mafia', 'don', 'maniac']);
     expect(getNightStepView(g.state)?.fake).toBe(true);
   });
 

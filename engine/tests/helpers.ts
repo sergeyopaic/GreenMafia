@@ -72,7 +72,7 @@ export function night(game: Game, choices: Partial<Record<ActionStep, number | n
   while (g.state.phase.t === 'night') {
     const view = getNightStepView(g.state);
     if (!view) break;
-    if (view.step !== 'meeting' && !view.fake) {
+    if (view.step !== 'meeting' && !view.fake && !view.blocked) {
       const seat = choices[view.step];
       g = act(g, { type: 'NightChoose', target: seat == null ? null : id(seat) });
     }

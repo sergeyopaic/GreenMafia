@@ -100,6 +100,7 @@ export function DiscussionScreen() {
           inert: true,
           speaker: p.id === speaker.id,
           candidate: candidates.includes(p.id),
+          alibi: playerHasAlibi(state, p.id),
           tag: candidates.includes(p.id) ? 'выставлен' : playerHasAlibi(state, p.id) ? 'алиби' : '',
           badge: state.settings.fouls && p.fouls > 0 ? p.fouls : undefined,
           badgeTone: p.fouls >= 3 ? 'danger' : 'default',

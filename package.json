@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "npm run dev --workspace app",
     "build": "npm run build --workspace app",
-    "test": "npm run test --workspace engine",
+    "test": "npm run test --workspace engine && npm run test --workspace app",
     "typecheck": "npm run typecheck --workspace engine && npm run typecheck --workspace app"
   }
 }
