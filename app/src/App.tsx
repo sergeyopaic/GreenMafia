@@ -3,6 +3,7 @@ import { type Theme, themeOf } from './lib/phase';
 import { GameScreen } from './screens/Game';
 import { HistoryScreen, ArchiveScreen } from './screens/History';
 import { HomeScreen } from './screens/Home';
+import { PlayersScreen, ProfileScreen } from './screens/Players';
 import { RulesScreen } from './screens/Rules';
 import { SetupScreen } from './screens/Setup';
 import { useApp } from './store';
@@ -91,7 +92,9 @@ export function App() {
         {ready && screen.name === 'setup' && <SetupScreen />}
         {ready && screen.name === 'game' && <GameScreen />}
         {ready && screen.name === 'history' && <HistoryScreen />}
-        {ready && screen.name === 'archive' && <ArchiveScreen saved={screen.game} />}
+        {ready && screen.name === 'archive' && <ArchiveScreen saved={screen.game} back={screen.back} />}
+        {ready && screen.name === 'players' && <PlayersScreen />}
+        {ready && screen.name === 'profile' && <ProfileScreen key={screen.id} id={screen.id} />}
         {ready && screen.name === 'rules' && <RulesScreen />}
       </div>
       {toast && (

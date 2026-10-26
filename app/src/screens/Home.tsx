@@ -54,6 +54,9 @@ export function HomeScreen() {
         <button type="button" className={`btn btn--block ${resumable ? 'btn--secondary' : 'btn--primary'}`} onClick={() => go({ name: 'setup' })}>
           Новая игра
         </button>
+        <button type="button" className="btn btn--secondary btn--block" onClick={() => go({ name: 'players' })}>
+          Игроки
+        </button>
         <div className="actions__row">
           <button type="button" className="btn btn--secondary" onClick={() => go({ name: 'rules' })}>
             Правила

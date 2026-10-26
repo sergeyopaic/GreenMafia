@@ -18,6 +18,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { MiniChip } from '../components/Chip';
 import { IconBack, RoleIcon } from '../components/icons';
+import { type PlayerProfile, loadPlayers, normalizeName, resolveSeats, savePlayers } from '../lib/players';
 import { type LastSetup, loadLastSetup, saveLastSetup } from '../lib/storage';
 import { ROLE_NAME, SETTINGS_GROUPS, type SettingMeta, getSetting, plural, setSetting } from '../lib/text';
 import { randomSeed, useApp } from '../store';
@@ -65,6 +66,11 @@ export function SetupScreen() {
   const [settings, setSettings] = useState<Settings>(CLASSIC_SETTINGS);
   const [dealing, setDealing] = useState<'app' | 'cards'>('app');
   const [cardRoles, setCardRoles] = useState<(Role | '')[]>([]);
+  const [profiles, setProfiles] = useState<PlayerProfile[]>([]);
+
+  useEffect(() => {
+    void loadPlayers().then(setProfiles);
+  }, []);
 
   useEffect(() => {
     void loadLastSetup().then((last) => {
@@ -92,11 +98,44 @@ export function SetupScreen() {
 
   const players = names.map((name, i) => ({ id: `p${i + 1}`, name: name.trim() || `Игрок ${i + 1}` }));
 
+  /** Seats a profile in the first empty place (adding a place if needed) or frees its place. */
+  function toggleProfile(p: PlayerProfile) {
+    const key = normalizeName(p.name);
+    const seated = names.findIndex((n) => normalizeName(n) === key);
+    if (seated >= 0) {
+      setNames(names.map((n, i) => (i === seated ? '' : n)));
+      return;
+    }
+    const empty = names.findIndex((n) => !n.trim());
+    if (empty >= 0) {
+      setNames(names.map((n, i) => (i === empty ? p.name : n)));
+    } else if (count < MAX_PLAYERS) {
+      const n = count + 1;
+      setCount(n);
+      setNames([...names, p.name]);
+      setComp(recommendedComposition(n));
+    } else {
+      useApp.getState().showToast(`За столом уже ${MAX_PLAYERS} игроков`);
+    }
+  }
+
+  const seats = useMemo(() => resolveSeats(names, profiles), [names, profiles]);
+
   function begin() {
+    if (seats.error) {
+      useApp.getState().showToast(seats.error);
+      setStep(0);
+      return;
+    }
+    if (seats.created.length > 0) {
+      const next = [...profiles, ...seats.created];
+      setProfiles(next);
+      void savePlayers(next);
+    }
     const event = {
       type: 'CreateGame' as const,
       settings,
-      players,
+      players: seats.players,
       composition: comp,
       dealing,
       ...(dealing === 'app' ? { seed: randomSeed() } : { roles: cardRoles as Role[] }),
@@ -107,7 +146,7 @@ export function SetupScreen() {
   }
 
   const canNext =
-    step === 0 ? true : step === 1 ? check.errors.length === 0 : step === 4 ? cardsValid(cardRoles, comp, count) : true;
+    step === 0 ? seats.error === null : step === 1 ? check.errors.length === 0 : step === 4 ? cardsValid(cardRoles, comp, count) : true;
 
   function next() {
     if (step === 3) {
@@ -155,7 +194,18 @@ export function SetupScreen() {
         ))}
       </div>
 
-      {step === 0 && <PlayersStep count={count} names={names} onCount={changeCount} onNames={setNames} />}
+      {step === 0 && (
+        <PlayersStep
+          count={count}
+          names={names}
+          onCount={changeCount}
+          onNames={setNames}
+          profiles={profiles}
+          onToggle={toggleProfile}
+          error={seats.error}
+          newNames={seats.created.map((p) => p.name)}
+        />
+      )}
       {step === 1 && <CompositionStep count={count} comp={comp} onComp={(c) => setComp(withCivilians(c, count))} check={check} />}
       {step === 2 && <RulesStep settings={settings} onChange={setSettings} />}
       {step === 3 && <DealStep dealing={dealing} onDealing={setDealing} count={count} comp={comp} />}
@@ -182,12 +232,21 @@ function PlayersStep({
   names,
   onCount,
   onNames,
+  profiles,
+  onToggle,
+  error,
+  newNames,
 }: {
   count: number;
   names: string[];
   onCount: (n: number) => void;
   onNames: (n: string[]) => void;
+  profiles: PlayerProfile[];
+  onToggle: (p: PlayerProfile) => void;
+  error: string | null;
+  newNames: string[];
 }) {
+  const seatedKeys = new Set(names.map(normalizeName).filter(Boolean));
   function move(i: number, d: -1 | 1) {
     const j = i + d;
     if (j < 0 || j >= names.length) return;
@@ -214,6 +273,22 @@ function PlayersStep({
           </div>
         </div>
       </section>
+
+      {profiles.length > 0 && (
+        <section className="field">
+          <div className="field__label">Из базы игроков — нажмите, чтобы посадить за стол</div>
+          <div className="roster">
+            {profiles.map((p) => (
+              <button type="button" key={p.id} aria-pressed={seatedKeys.has(normalizeName(p.name))} onClick={() => onToggle(p)}>
+                <span className="avatar" aria-hidden="true">
+                  <span>{(p.name[0] ?? '?').toLocaleUpperCase('ru-RU')}</span>
+                </span>
+                {p.name}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="field">
         <div className="field__label">Имена по порядку мест, по часовой стрелке</div>
@@ -242,6 +317,10 @@ function PlayersStep({
             </div>
           </div>
         ))}
+        {error && <div className="notice notice--warn">{error}</div>}
+        {!error && newNames.length > 0 && (
+          <div className="notice">Новые в базе после старта: {newNames.join(', ')}.</div>
+        )}
         <button type="button" className="btn btn--ghost" style={{ alignSelf: 'flex-start' }} onClick={() => onNames(names.map(() => ''))}>
           очистить имена
         </button>

@@ -27,7 +27,7 @@ const K_CURRENT = 'gm.current';
 const K_HISTORY = 'gm.history';
 const K_SETUP = 'gm.lastSetup';
 const K_PREFS = 'gm.prefs';
-const HISTORY_LIMIT = 50;
+const HISTORY_LIMIT = 500;
 
 async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   try {

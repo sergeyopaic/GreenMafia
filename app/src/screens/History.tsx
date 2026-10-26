@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { IconBack } from '../components/icons';
 import { type SavedGame, loadHistory } from '../lib/storage';
 import { RESULT_TITLE, plural } from '../lib/text';
-import { useApp } from '../store';
+import { type Screen, useApp } from '../store';
 import { CaseFile } from './game/GameOver';
 
 function fmtDate(ts: number): string {
@@ -26,7 +26,7 @@ export function HistoryScreen() {
         </button>
         <div className="topbar__title">
           <b>Архив дел</b>
-          <span>последние 50 игр</span>
+          <span>последние 500 партий</span>
         </div>
       </header>
       {items && items.length === 0 && <p className="hand" style={{ fontSize: 22 }}>Архив пуст. Сыграйте первую партию.</p>}
@@ -60,13 +60,13 @@ export function HistoryScreen() {
   );
 }
 
-export function ArchiveScreen({ saved }: { saved: SavedGame }) {
+export function ArchiveScreen({ saved, back }: { saved: SavedGame; back?: Screen }) {
   const go = useApp((s) => s.go);
   const r = replay(saved.events);
   return (
     <main className="screen">
       <header className="topbar">
-        <button type="button" className="icon-btn" onClick={() => go({ name: 'history' })} aria-label="Назад">
+        <button type="button" className="icon-btn" onClick={() => go(back ?? { name: 'history' })} aria-label="Назад">
           <IconBack />
         </button>
         <div className="topbar__title">

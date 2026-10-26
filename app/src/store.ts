@@ -26,8 +26,10 @@ export type Screen =
   | { name: 'setup' }
   | { name: 'game' }
   | { name: 'history' }
-  | { name: 'archive'; game: SavedGame }
-  | { name: 'rules' };
+  | { name: 'archive'; game: SavedGame; back?: Screen }
+  | { name: 'rules' }
+  | { name: 'players' }
+  | { name: 'profile'; id: string };
 
 interface Toast {
   id: number;
