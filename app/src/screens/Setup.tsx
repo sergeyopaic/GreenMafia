@@ -1,0 +1,524 @@
+import {
+  CLASSIC_SETTINGS,
+  type Composition,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  PRESETS,
+  type PresetName,
+  ROLES,
+  ROLE_TEAM,
+  type Role,
+  SINGLE_ROLES,
+  type Settings,
+  TEAM_NAME,
+  recommendedComposition,
+  validateComposition,
+} from '@greenmafia/engine';
+import { useEffect, useMemo, useState } from 'react';
+import { MiniChip } from '../components/Chip';
+import { IconBack, RoleIcon } from '../components/icons';
+import { type LastSetup, loadLastSetup, saveLastSetup } from '../lib/storage';
+import { ROLE_NAME, SETTINGS_GROUPS, type SettingMeta, getSetting, plural, setSetting } from '../lib/text';
+import { randomSeed, useApp } from '../store';
+
+type Step = 0 | 1 | 2 | 3 | 4;
+const STEP_TITLES = ['Игроки', 'Состав', 'Правила', 'Раздача', 'Карты'];
+
+function resize(names: string[], n: number): string[] {
+  return Array.from({ length: n }, (_, i) => names[i] ?? '');
+}
+
+function withCivilians(c: Composition, n: number): Composition {
+  const others = c.mafia + c.commissar + c.doctor + c.lover + c.maniac;
+  return { ...c, civilian: n - others };
+}
+
+function samePreset(s: Settings): PresetName | 'custom' {
+  for (const [name, preset] of Object.entries(PRESETS)) {
+    if (JSON.stringify(preset) === JSON.stringify(s)) return name as PresetName;
+  }
+  return 'custom';
+}
+
+export function SetupScreen() {
+  const { go, startGame } = useApp();
+  const [loaded, setLoaded] = useState(false);
+  const [step, setStep] = useState<Step>(0);
+  const [count, setCount] = useState(10);
+  const [names, setNames] = useState<string[]>(resize([], 10));
+  const [comp, setComp] = useState<Composition>(recommendedComposition(10));
+  const [settings, setSettings] = useState<Settings>(CLASSIC_SETTINGS);
+  const [dealing, setDealing] = useState<'app' | 'cards'>('app');
+  const [cardRoles, setCardRoles] = useState<(Role | '')[]>([]);
+
+  useEffect(() => {
+    void loadLastSetup().then((last) => {
+      if (last) {
+        const n = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, last.count));
+        setCount(n);
+        setNames(resize(last.names, n));
+        setSettings({ ...CLASSIC_SETTINGS, ...last.settings, timers: { ...CLASSIC_SETTINGS.timers, ...last.settings.timers } });
+        setComp(last.composition && validateComposition(n, last.composition).errors.length === 0 ? last.composition : recommendedComposition(n));
+        setDealing(last.dealing);
+      }
+      setLoaded(true);
+    });
+  }, []);
+
+  const check = useMemo(() => validateComposition(count, comp), [count, comp]);
+
+  function changeCount(n: number) {
+    const c = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, n));
+    setCount(c);
+    setNames((ns) => resize(ns, c));
+    setComp(recommendedComposition(c));
+  }
+
+  const players = names.map((name, i) => ({ id: `p${i + 1}`, name: name.trim() || `Игрок ${i + 1}` }));
+
+  function begin() {
+    const event = {
+      type: 'CreateGame' as const,
+      settings,
+      players,
+      composition: comp,
+      dealing,
+      ...(dealing === 'app' ? { seed: randomSeed() } : { roles: cardRoles as Role[] }),
+    };
+    const last: LastSetup = { names, count, preset: samePreset(settings), settings, composition: comp, dealing };
+    void saveLastSetup(last);
+    startGame(event);
+  }
+
+  const canNext =
+    step === 0 ? true : step === 1 ? check.errors.length === 0 : step === 4 ? cardsValid(cardRoles, comp, count) : true;
+
+  function next() {
+    if (step === 3) {
+      if (dealing === 'app') begin();
+      else {
+        setCardRoles(Array<Role | ''>(count).fill(''));
+        setStep(4);
+      }
+      return;
+    }
+    if (step === 4) {
+      begin();
+      return;
+    }
+    setStep((s) => (s + 1) as Step);
+    window.scrollTo(0, 0);
+  }
+
+  function back() {
+    if (step === 0) go({ name: 'home' });
+    else setStep((s) => (s - 1) as Step);
+    window.scrollTo(0, 0);
+  }
+
+  if (!loaded) return null;
+
+  const total = dealing === 'cards' ? 5 : 4;
+
+  return (
+    <main className="screen">
+      <header className="topbar">
+        <button type="button" className="icon-btn" onClick={back} aria-label="Назад">
+          <IconBack />
+        </button>
+        <div className="topbar__title">
+          <b>{STEP_TITLES[step]}</b>
+          <span>
+            новое дело · шаг {step + 1} из {total}
+          </span>
+        </div>
+      </header>
+      <div className="wizard-steps" aria-hidden="true">
+        {Array.from({ length: total }, (_, i) => (
+          <span key={i} className={i <= step ? 'is-on' : ''} />
+        ))}
+      </div>
+
+      {step === 0 && <PlayersStep count={count} names={names} onCount={changeCount} onNames={setNames} />}
+      {step === 1 && <CompositionStep count={count} comp={comp} onComp={(c) => setComp(withCivilians(c, count))} check={check} />}
+      {step === 2 && <RulesStep settings={settings} onChange={setSettings} />}
+      {step === 3 && <DealStep dealing={dealing} onDealing={setDealing} count={count} comp={comp} />}
+      {step === 4 && <CardsStep names={players.map((p) => p.name)} roles={cardRoles} comp={comp} onRoles={setCardRoles} />}
+
+      <div className="actions">
+        <div className="actions__row">
+          <button type="button" className="btn btn--secondary" onClick={back}>
+            Назад
+          </button>
+          <button type="button" className="btn btn--primary" disabled={!canNext} onClick={next}>
+            {step === 4 || (step === 3 && dealing === 'app') ? 'Начать игру' : 'Дальше'}
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// ---------- Step 1: players ----------
+
+function PlayersStep({
+  count,
+  names,
+  onCount,
+  onNames,
+}: {
+  count: number;
+  names: string[];
+  onCount: (n: number) => void;
+  onNames: (n: string[]) => void;
+}) {
+  function move(i: number, d: -1 | 1) {
+    const j = i + d;
+    if (j < 0 || j >= names.length) return;
+    const copy = [...names];
+    [copy[i], copy[j]] = [copy[j] ?? '', copy[i] ?? ''];
+    onNames(copy);
+  }
+  return (
+    <>
+      <section className="folder">
+        <span className="folder__tab">состав стола</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h2>{count}</h2>
+            <div className="muted">{plural(count, 'игрок', 'игрока', 'игроков')} за столом</div>
+          </div>
+          <div className="stepper">
+            <button type="button" onClick={() => onCount(count - 1)} disabled={count <= MIN_PLAYERS} aria-label="Меньше">
+              −
+            </button>
+            <button type="button" onClick={() => onCount(count + 1)} disabled={count >= MAX_PLAYERS} aria-label="Больше">
+              +
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="field">
+        <div className="field__label">Имена по порядку мест, по часовой стрелке</div>
+        {names.map((name, i) => (
+          <div className="name-row" key={i}>
+            <MiniChip player={{ seat: i + 1 }} />
+            <input
+              className="input"
+              value={name}
+              placeholder={`Игрок ${i + 1}`}
+              maxLength={20}
+              onChange={(e) => {
+                const copy = [...names];
+                copy[i] = e.target.value;
+                onNames(copy);
+              }}
+              aria-label={`Имя игрока на месте ${i + 1}`}
+            />
+            <div className="name-row__move">
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Выше">
+                ↑
+              </button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === names.length - 1} aria-label="Ниже">
+                ↓
+              </button>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="btn btn--ghost" style={{ alignSelf: 'flex-start' }} onClick={() => onNames(names.map(() => ''))}>
+          очистить имена
+        </button>
+      </section>
+    </>
+  );
+}
+
+// ---------- Step 2: composition ----------
+
+function CompositionStep({
+  count,
+  comp,
+  onComp,
+  check,
+}: {
+  count: number;
+  comp: Composition;
+  onComp: (c: Composition) => void;
+  check: ReturnType<typeof validateComposition>;
+}) {
+  const editable: Role[] = ['mafia', 'commissar', 'doctor', 'lover', 'maniac'];
+  const pin = check.balance === 'town' ? 18 : check.balance === 'mafia' ? 82 : 50;
+  const isRecommended = JSON.stringify(comp) === JSON.stringify(recommendedComposition(count));
+
+  return (
+    <>
+      <section className="folder">
+        <span className="folder__tab">кто за столом</span>
+        {[...editable, 'civilian' as Role].map((role) => {
+          const max = (SINGLE_ROLES as readonly Role[]).includes(role) ? 1 : 6;
+          const min = role === 'mafia' ? 1 : 0;
+          return (
+            <div className="role-line" key={role}>
+              <RoleIcon role={role} className="role-line__icon" />
+              <div className="role-line__name">
+                {ROLE_NAME[role]}
+                <div className="list__sub">{TEAM_NAME[ROLE_TEAM[role]]}</div>
+              </div>
+              {role === 'civilian' ? (
+                <div className="stepper">
+                  <output style={{ color: comp.civilian < 0 ? 'var(--danger)' : undefined }}>{comp.civilian}</output>
+                </div>
+              ) : (
+                <div className="stepper">
+                  <button type="button" disabled={comp[role] <= min} onClick={() => onComp({ ...comp, [role]: comp[role] - 1 })} aria-label="Меньше">
+                    −
+                  </button>
+                  <output>{comp[role]}</output>
+                  <button
+                    type="button"
+                    disabled={comp[role] >= max || comp.civilian <= 0}
+                    onClick={() => onComp({ ...comp, [role]: comp[role] + 1 })}
+                    aria-label="Больше"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </section>
+
+      <div className="balance" aria-label="Баланс">
+        <span>город</span>
+        <div className="balance__scale">
+          <div className="balance__pin" style={{ left: `${pin}%` }} />
+        </div>
+        <span>мафия</span>
+      </div>
+      <p className="center type muted" style={{ fontSize: 14 }}>
+        {check.balance === 'balanced' ? 'Баланс в норме' : check.balance === 'town' ? 'Перевес города' : 'Перевес мафии'}
+        {isRecommended ? ' · состав по таблице' : ''}
+      </p>
+
+      {check.errors.map((e) => (
+        <div className="notice notice--warn" key={e.code}>
+          {e.message}
+        </div>
+      ))}
+      {check.warnings.map((w) => (
+        <div className="notice" key={w.code}>
+          {w.message}
+        </div>
+      ))}
+      {!isRecommended && (
+        <button type="button" className="btn btn--ghost" style={{ alignSelf: 'center' }} onClick={() => onComp(recommendedComposition(count))}>
+          вернуть рекомендованный состав
+        </button>
+      )}
+      <p className="hand" style={{ fontSize: 18 }}>
+        Мирных считаю сам: все, кому не досталась особая роль.
+      </p>
+    </>
+  );
+}
+
+// ---------- Step 3: rules ----------
+
+function RulesStep({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
+  const preset = samePreset(settings);
+  return (
+    <>
+      <div className="field">
+        <div className="field__label">Набор правил</div>
+        <div className="seg" role="group">
+          <button type="button" aria-pressed={preset === 'classic'} onClick={() => onChange(PRESETS.classic)}>
+            Классика
+          </button>
+          <button type="button" aria-pressed={preset === 'sports'} onClick={() => onChange(PRESETS.sports)}>
+            Спортивная
+          </button>
+          <button type="button" aria-pressed={preset === 'custom'} disabled>
+            Своя
+          </button>
+        </div>
+      </div>
+      {SETTINGS_GROUPS.map((g) => (
+        <section className="folder" key={g.title}>
+          <span className="folder__tab">{g.title}</span>
+          <div className="list">
+            {g.items.map((m) => (
+              <SettingRow key={m.path} meta={m} settings={settings} onChange={onChange} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+
+function SettingRow({ meta, settings, onChange }: { meta: SettingMeta; settings: Settings; onChange: (s: Settings) => void }) {
+  const value = getSetting(settings, meta.path);
+  const set = (v: unknown) => onChange(setSetting(settings, meta.path, v));
+
+  if (meta.kind === 'bool') {
+    return (
+      <div className="list__row">
+        <div className="list__main">
+          <div>{meta.label}</div>
+          {meta.hint && <div className="list__sub">{meta.hint}</div>}
+        </div>
+        <button type="button" role="switch" className="switch" aria-checked={value === true} aria-label={meta.label} onClick={() => set(!value)} />
+      </div>
+    );
+  }
+  if (meta.kind === 'number') {
+    const n = Number(value);
+    return (
+      <div className="list__row">
+        <div className="list__main">
+          <div>{meta.label}</div>
+          {meta.hint && <div className="list__sub">{meta.hint}</div>}
+        </div>
+        <div className="stepper">
+          <button type="button" disabled={n <= (meta.min ?? 0)} onClick={() => set(Math.max(meta.min ?? 0, n - (meta.step ?? 1)))} aria-label="Меньше">
+            −
+          </button>
+          <output style={{ fontSize: 22, minWidth: 52 }}>
+            {n}
+            <small style={{ fontSize: 13 }}>{meta.unit}</small>
+          </output>
+          <button type="button" disabled={n >= (meta.max ?? 999)} onClick={() => set(Math.min(meta.max ?? 999, n + (meta.step ?? 1)))} aria-label="Больше">
+            +
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="list__row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+      <div>
+        <div>{meta.label}</div>
+        {meta.hint && <div className="list__sub">{meta.hint}</div>}
+      </div>
+      <div className="seg" role="group" aria-label={meta.label}>
+        {meta.choices?.map((c) => (
+          <button type="button" key={String(c.value)} aria-pressed={value === c.value} onClick={() => set(c.value)}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Step 4: dealing ----------
+
+function DealStep({
+  dealing,
+  onDealing,
+  count,
+  comp,
+}: {
+  dealing: 'app' | 'cards';
+  onDealing: (d: 'app' | 'cards') => void;
+  count: number;
+  comp: Composition;
+}) {
+  const summary = ROLES.filter((r) => comp[r] > 0)
+    .map((r) => (comp[r] > 1 || r === 'civilian' || r === 'mafia' ? `${ROLE_NAME[r].toLowerCase()} × ${comp[r]}` : ROLE_NAME[r].toLowerCase()))
+    .join(', ');
+  return (
+    <>
+      <button type="button" className="choice-card" aria-pressed={dealing === 'app'} onClick={() => onDealing('app')}>
+        <RoleIcon role="mafia" width={36} height={36} />
+        <div>
+          <b>Приложение раздаст</b>
+          <span>Телефон идёт по кругу. Каждый открывает свой конверт, видит роль и передаёт дальше.</span>
+        </div>
+      </button>
+      <button type="button" className="choice-card" aria-pressed={dealing === 'cards'} onClick={() => onDealing('cards')}>
+        <RoleIcon role="civilian" width={36} height={36} />
+        <div>
+          <b>Раздам картами сам</b>
+          <span>Раздайте физические карты, а потом отметьте, у кого какая роль.</span>
+        </div>
+      </button>
+      <section className="folder">
+        <span className="folder__tab">итого</span>
+        <p>
+          <b>{count}</b> {plural(count, 'игрок', 'игрока', 'игроков')}: {summary}.
+        </p>
+      </section>
+    </>
+  );
+}
+
+// ---------- Step 5: physical cards ----------
+
+function cardsValid(roles: (Role | '')[], comp: Composition, count: number): boolean {
+  if (roles.length !== count || roles.some((r) => r === '')) return false;
+  return ROLES.every((r) => roles.filter((x) => x === r).length === comp[r]);
+}
+
+function CardsStep({
+  names,
+  roles,
+  comp,
+  onRoles,
+}: {
+  names: string[];
+  roles: (Role | '')[];
+  comp: Composition;
+  onRoles: (r: (Role | '')[]) => void;
+}) {
+  const left = (r: Role) => comp[r] - roles.filter((x) => x === r).length;
+  const special: Role[] = ROLES.filter((r) => r !== 'civilian' && comp[r] > 0);
+  return (
+    <>
+      <p className="muted">Отметьте особые роли — всем остальным достанется «Мирный житель».</p>
+      <div className="notice notice--host">Не показывайте этот экран игрокам.</div>
+      <div className="list">
+        {names.map((name, i) => (
+          <div className="list__row" key={i} style={{ flexWrap: 'wrap' }}>
+            <MiniChip player={{ seat: i + 1 }} />
+            <div className="list__main">{name}</div>
+            <select
+              className="input"
+              style={{ width: 'auto', fontFamily: 'var(--font-ui)', fontSize: 15 }}
+              value={roles[i] ?? ''}
+              onChange={(e) => {
+                const copy = [...roles];
+                copy[i] = e.target.value as Role | '';
+                onRoles(copy);
+              }}
+              aria-label={`Роль игрока ${i + 1}`}
+            >
+              <option value="">—</option>
+              {ROLES.map((r) => (
+                <option key={r} value={r} disabled={comp[r] === 0 || (left(r) <= 0 && roles[i] !== r)}>
+                  {ROLE_NAME[r]}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="btn btn--secondary"
+        disabled={special.some((r) => left(r) > 0)}
+        onClick={() => onRoles(roles.map((r) => (r === '' ? 'civilian' : r)))}
+      >
+        Остальные — мирные
+      </button>
+      <p className="list__sub">
+        Осталось раздать:{' '}
+        {ROLES.filter((r) => left(r) !== 0)
+          .map((r) => `${ROLE_NAME[r].toLowerCase()} ${left(r)}`)
+          .join(', ') || 'всё сходится'}
+      </p>
+    </>
+  );
+}

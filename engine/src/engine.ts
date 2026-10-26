@@ -1,0 +1,239 @@
+// Event-sourced game engine (GAME_DESIGN.md §13).
+// The state is always `events.reduce(apply)`; undo = drop the last event and replay.
+
+import {
+  afterDayRemoval,
+  castVotes,
+  defenseProceed,
+  discussionProceed,
+  lastWordsProceed,
+  morningProceed,
+  nominate,
+  verdictProceed,
+} from './day';
+import { type EngineError, type Result, RuleError, fail } from './errors';
+import { getPlayer, label } from './helpers';
+import { nightChoose, nightProceed, startNight } from './night';
+import { MAX_PLAYERS, MIN_PLAYERS, ROLES, validateComposition } from './roles';
+import { shuffle } from './rng';
+import { withDefaults } from './settings';
+import type { CreateGameEvent, GameEvent, GameState, Player, Role } from './types';
+import { checkWinner } from './win';
+
+export interface Game {
+  events: GameEvent[];
+  state: GameState;
+}
+
+// ---------- Creating a game ----------
+
+function createState(e: CreateGameEvent): GameState {
+  const settings = withDefaults(e.settings);
+  const n = e.players.length;
+  if (n < MIN_PLAYERS || n > MAX_PLAYERS) {
+    fail('players.range', `Игроков должно быть от ${MIN_PLAYERS} до ${MAX_PLAYERS}`);
+  }
+  const ids = new Set(e.players.map((p) => p.id));
+  if (ids.size !== n || e.players.some((p) => !p.id)) fail('players.ids', 'У игроков должны быть разные id');
+
+  const check = validateComposition(n, e.composition);
+  const firstError = check.errors[0];
+  if (firstError) fail(firstError.code, firstError.message);
+
+  const pool: Role[] = ROLES.flatMap((r) => Array<Role>(e.composition[r]).fill(r));
+  let roles: Role[];
+  if (e.dealing === 'app') {
+    if (!e.seed) fail('deal.seed', 'Для раздачи нужно зерно');
+    roles = shuffle(pool, e.seed);
+  } else {
+    if (!e.roles || e.roles.length !== n) fail('deal.roles', 'Укажите роль каждого игрока');
+    const given = [...e.roles].sort().join();
+    if (given !== [...pool].sort().join()) {
+      fail('deal.mismatch', 'Розданные роли не совпадают с составом');
+    }
+    roles = e.roles;
+  }
+
+  const players: Player[] = e.players.map((p, i) => ({
+    id: p.id,
+    seat: i + 1,
+    name: p.name.trim() || `Игрок ${i + 1}`,
+    role: roles[i] as Role,
+    alive: true,
+    death: null,
+    fouls: 0,
+    skipNextSpeech: false,
+  }));
+
+  const state: GameState = {
+    version: 1,
+    settings,
+    composition: { ...e.composition },
+    dealing: e.dealing,
+    seed: e.seed ?? null,
+    players,
+    phase: { t: 'reveal', index: 0 },
+    nights: [],
+    days: [],
+    memory: { lastLoverTarget: null, lastDoctorTarget: null, doctorSelfHeals: 0 },
+    alibi: null,
+    pendingResult: null,
+  };
+  if (e.dealing === 'cards') startNight(state, 1);
+  return state;
+}
+
+// ---------- Applying events ----------
+
+/** Applies one event to a copy of the state. Throws RuleError on an invalid event. */
+export function applyEvent(prev: GameState | null, event: GameEvent): GameState {
+  if (event.type === 'CreateGame') {
+    if (prev) fail('game.exists', 'Игра уже создана');
+    return createState(event);
+  }
+  if (!prev) fail('game.none', 'Игра ещё не создана');
+  const state = structuredClone(prev);
+  const ph = state.phase;
+
+  if (ph.t === 'gameOver') fail('game.over', 'Игра окончена');
+
+  switch (event.type) {
+    case 'Proceed':
+      proceed(state);
+      break;
+    case 'NightChoose':
+      nightChoose(state, event.target);
+      break;
+    case 'Nominate':
+      nominate(state, event.candidate);
+      break;
+    case 'CastVotes':
+      castVotes(state, event);
+      break;
+    case 'RemovePlayer':
+      removePlayer(state, event.playerId, event.cause);
+      break;
+    case 'Foul':
+      foul(state, event.playerId);
+      break;
+    case 'EndGame':
+      state.phase = {
+        t: 'gameOver',
+        result: { winner: event.result === 'draw' ? 'draw' : 'aborted', reason: 'manual' },
+      };
+      break;
+    default: {
+      const never: never = event;
+      fail('event.unknown', `Неизвестное событие ${(never as GameEvent).type}`);
+    }
+  }
+  return state;
+}
+
+function proceed(state: GameState): void {
+  const ph = state.phase;
+  switch (ph.t) {
+    case 'reveal':
+      if (ph.index + 1 >= state.players.length) startNight(state, 1);
+      else state.phase = { t: 'reveal', index: ph.index + 1 };
+      return;
+    case 'night':
+      return nightProceed(state);
+    case 'morning':
+      return morningProceed(state);
+    case 'lastWords':
+      return lastWordsProceed(state);
+    case 'discussion':
+      return discussionProceed(state);
+    case 'defense':
+      return defenseProceed(state);
+    case 'verdict':
+      return verdictProceed(state);
+    case 'voting':
+      fail('vote.pending', 'Сначала внесите голоса');
+    case 'gameOver':
+      fail('game.over', 'Игра окончена');
+  }
+}
+
+// ---------- Removal and fouls (§11.1, §11.2) ----------
+
+function removePlayer(state: GameState, id: string, cause: 'removed' | 'left'): void {
+  const ph = state.phase;
+  if (ph.t === 'reveal') fail('remove.reveal', 'Дождитесь окончания раздачи ролей');
+  const p = getPlayer(state, id);
+  if (!p.alive) fail('remove.dead', `${label(p)} уже выбыл`);
+
+  const isNight = ph.t === 'night';
+  const number = 'number' in ph ? ph.number : 0;
+  p.alive = false;
+  p.death = { cause, phase: isNight ? 'night' : 'day', number };
+
+  const result = checkWinner(state.players, state.settings.earlyWinDetection);
+  if (result) {
+    state.phase = { t: 'gameOver', result };
+    return;
+  }
+  if (ph.t === 'morning' || ph.t === 'verdict') state.pendingResult = null;
+  // At night the removed player's choice is ignored at resolution (they are no longer alive).
+  if (!isNight) afterDayRemoval(state);
+}
+
+function foul(state: GameState, id: string): void {
+  if (!state.settings.fouls) fail('foul.off', 'Фолы выключены в настройках');
+  if (state.phase.t === 'reveal') fail('foul.reveal', 'Дождитесь окончания раздачи ролей');
+  const p = getPlayer(state, id);
+  if (!p.alive) fail('foul.dead', `${label(p)} уже выбыл`);
+  p.fouls += 1;
+  if (p.fouls === 3) p.skipNextSpeech = true;
+  if (p.fouls >= 4) removePlayer(state, id, 'removed');
+}
+
+// ---------- Public API ----------
+
+function toError(err: unknown): EngineError {
+  if (err instanceof RuleError) return { code: err.code, message: err.message };
+  throw err;
+}
+
+export function newGame(event: CreateGameEvent): Result<Game> {
+  try {
+    return { ok: true, value: { events: [event], state: applyEvent(null, event) } };
+  } catch (err) {
+    return { ok: false, error: toError(err) };
+  }
+}
+
+/** Applies an event. On a rule violation the game is unchanged and the error explains why. */
+export function dispatch(game: Game, event: GameEvent): Result<Game> {
+  try {
+    const state = applyEvent(game.state, event);
+    return { ok: true, value: { events: [...game.events, event], state } };
+  } catch (err) {
+    return { ok: false, error: toError(err) };
+  }
+}
+
+/** Rebuilds the game from its event log. */
+export function replay(events: GameEvent[]): Result<Game> {
+  try {
+    let state: GameState | null = null;
+    for (const e of events) state = applyEvent(state, e);
+    if (!state) fail('game.none', 'Журнал пуст');
+    return { ok: true, value: { events: [...events], state } };
+  } catch (err) {
+    return { ok: false, error: toError(err) };
+  }
+}
+
+/** Undo the last action. Game creation itself cannot be undone. */
+export function undo(game: Game): Game {
+  if (game.events.length <= 1) return game;
+  const r = replay(game.events.slice(0, -1));
+  if (!r.ok) throw new Error(`Журнал повреждён: ${r.error.message}`);
+  return r.value;
+}
+
+export function canUndo(game: Game): boolean {
+  return game.events.length > 1;
+}
