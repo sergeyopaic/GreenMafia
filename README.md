@@ -9,7 +9,7 @@
 The app deals the roles, runs the night, keeps the timers, counts the votes and remembers every detail.
 The host just reads the script aloud.
 
-English · Русский · Installable PWA · Works offline
+English · Русский · Installable PWA · Works offline · Free for noncommercial use
 
 <img src="docs/screenshots/home.webp" width="230" alt="Home screen">
 <img src="docs/screenshots/night.webp" width="230" alt="Night: the Commissar chooses whom to check">
@@ -32,6 +32,7 @@ English · Русский · Installable PWA · Works offline
 - [Under the hood](#under-the-hood)
 - [Documentation](#documentation)
 - [Assets and credits](#assets-and-credits)
+- [License](#license)
 
 ## What it is
 
@@ -261,3 +262,15 @@ The full rules, every edge case, the settings, the host script, the screens and 
 - The role illustrations and paper textures were generated for this project. The prompts are in [`app/src/assets/generation-prompts.json`](app/src/assets/generation-prompts.json).
 - The sound effects are original and generated procedurally by [`app/scripts/make-sounds.mjs`](app/scripts/make-sounds.mjs).
 - The stamps use **Rubik Dirt** under the SIL Open Font License ([license](app/src/assets/RUBIK-DIRT-LICENSE.txt)). The other fonts come from [Fontsource](https://fontsource.org/), each under its own open license.
+
+## License
+
+GreenMafia is **source-available** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
+
+- ✅ **You may** use the app for free, play it with friends or in an amateur club, study the code, change it and share your changes — for any noncommercial purpose. Schools, charities and other noncommercial organizations may use it too.
+- ❌ **You may not** sell the app or a copy of it (including a paid or ad-supported version in an app store), or use the code in any commercial product or service.
+- 📝 Every copy must keep the license and the `Required Notice` line with the author's name.
+
+Want to use GreenMafia commercially? [Open an issue](https://github.com/sergeyopaic/GreenMafia/issues) to ask for a commercial license.
+
+Copyright © 2026 Sergey Ivanov. The fonts keep their own licenses (see [Assets and credits](#assets-and-credits)).
