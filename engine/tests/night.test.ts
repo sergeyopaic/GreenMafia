@@ -135,7 +135,9 @@ describe('ночь: доктор', () => {
     }
     const opt = getNightStepView(g.state)?.options.find((o) => o.player.seat === 7);
     expect(opt?.allowed).toBe(false);
-    expect(opt?.reason).toContain('прошлой ночью');
+    expect(opt?.reason?.message).toContain('прошлой ночью');
+    expect(opt?.reason?.code).toBe('target.doctor.repeat');
+    expect(opt?.reason?.params).toEqual({ seat: 7 });
     expectError(g, { type: 'NightChoose', target: id(7) }, 'night.target');
     g = act(g, { type: 'NightChoose', target: id(8) });
     g = night(proceed(g));

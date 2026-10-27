@@ -1,7 +1,7 @@
-import { MAX_NAME_LENGTH, type Player, ROLE_TEAM, TEAM_NAME, playerHasAlibi, undo as engineUndo } from '@greenmafia/engine';
+import { MAX_NAME_LENGTH, type Player, ROLE_TEAM, type Role, playerHasAlibi, undo as engineUndo } from '@greenmafia/engine';
 import { useEffect, useState } from 'react';
 import { phaseTitle } from '../lib/phase';
-import { DEATH_CAUSE, ROLE_NAME, plural } from '../lib/text';
+import { useT } from '../i18n';
 import { useApp, useGame } from '../store';
 import { MiniChip } from './Chip';
 import { RoleBrief } from './RoleBrief';
@@ -39,13 +39,15 @@ type Dialog =
 
 export function GameBar() {
   const state = useGame();
+  const t = useT();
+  const b = t.bar;
   const game = useApp((s) => s.game);
   const { dispatch, undo, paused, setPaused, closeGame, sound, toggleSound } = useApp();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [tab, setTab] = useState<'players' | 'game'>('players');
   const [draft, setDraft] = useState('');
   const [peek, setPeek] = useState(false);
-  const { title, sub } = phaseTitle(state);
+  const { title, sub } = phaseTitle(state, t);
   const over = state.phase.t === 'gameOver';
   const inReveal = state.phase.t === 'reveal';
   const undoable = !!game && game.events.length > 1 && !inReveal;
@@ -80,10 +82,10 @@ export function GameBar() {
   /** Public status only: never the role. */
   function statusLine(p: Player): string {
     const parts: string[] = [];
-    if (p.alive) parts.push('в игре');
-    else parts.push(p.death ? `${DEATH_CAUSE[p.death.cause]} (${p.death.phase === 'night' ? 'ночь' : 'день'} ${p.death.number})` : 'выбыл');
-    if (p.alive && playerHasAlibi(state, p.id)) parts.push('алиби');
-    if (state.settings.fouls && p.fouls > 0) parts.push(`${p.fouls} ${plural(p.fouls, 'фол', 'фола', 'фолов')}`);
+    if (p.alive) parts.push(b.statusIn);
+    else parts.push(p.death ? `${t.death[p.death.cause]} (${t.when(p.death.phase, p.death.number)})` : b.statusOut);
+    if (p.alive && playerHasAlibi(state, p.id)) parts.push(t.chip.alibi);
+    if (state.settings.fouls && p.fouls > 0) parts.push(t.count.fouls(p.fouls));
     return parts.join(' · ');
   }
 
@@ -94,7 +96,7 @@ export function GameBar() {
           <b>{title}</b>
           <span>{sub}</span>
         </div>
-        <button type="button" className="icon-btn" disabled={!undoable} onClick={onUndo} aria-label="Отменить последнее действие">
+        <button type="button" className="icon-btn" disabled={!undoable} onClick={onUndo} aria-label={b.undo}>
           <IconUndo />
         </button>
         {!over && (
@@ -102,7 +104,7 @@ export function GameBar() {
             type="button"
             className={`icon-btn${paused ? ' icon-btn--active' : ''}`}
             onClick={() => setPaused(!paused)}
-            aria-label={paused ? 'Продолжить' : 'Пауза'}
+            aria-label={paused ? b.resume : b.pause}
           >
             {paused ? <IconPlay /> : <IconPause />}
           </button>
@@ -116,19 +118,19 @@ export function GameBar() {
               setPeek(true);
             }}
             onContextMenu={(e) => e.preventDefault()}
-            aria-label="Шпаргалка ролей: удерживайте"
+            aria-label={b.eye}
           >
             <IconEye />
           </button>
         )}
-        <button type="button" className="icon-btn" onClick={() => setDialog('menu')} aria-label="Пульт ведущего">
+        <button type="button" className="icon-btn" onClick={() => setDialog('menu')} aria-label={b.console}>
           <IconMenu />
         </button>
       </header>
 
       {peek && (
         <div className="overlay overlay--top" style={{ textAlign: 'left', alignItems: 'stretch' }}>
-          <div className="eyebrow">Шпаргалка ведущего · отпустите, чтобы скрыть</div>
+          <div className="eyebrow">{b.peekTitle}</div>
           <div className="list">
             {state.players.map((p) => (
               <div className="list__row" key={p.id} style={{ opacity: p.alive ? 1 : 0.45 }}>
@@ -136,13 +138,13 @@ export function GameBar() {
                 <div className="list__main">
                   <div className="list__title">{p.name}</div>
                   <div className="list__sub">
-                    {TEAM_NAME[ROLE_TEAM[p.role]]}
-                    {!p.alive && ' · выбыл'}
-                    {p.fouls > 0 && ` · фолов: ${p.fouls}`}
+                    {t.roles.team[ROLE_TEAM[p.role]]}
+                    {!p.alive && b.out}
+                    {p.fouls > 0 && b.fouls(p.fouls)}
                   </div>
                 </div>
                 <RoleIcon role={p.role} width={24} height={24} />
-                <span style={{ minWidth: 96, textAlign: 'right' }}>{ROLE_NAME[p.role]}</span>
+                <span style={{ minWidth: 96, textAlign: 'right' }}>{t.roles.name[p.role]}</span>
               </div>
             ))}
           </div>
@@ -151,29 +153,29 @@ export function GameBar() {
 
       {paused && (
         <div className="overlay">
-          <div className="eyebrow">игра остановлена</div>
-          <h1>Пауза</h1>
-          <p className="muted">Таймеры стоят. На экране ничего секретного.</p>
+          <div className="eyebrow">{b.pausedEyebrow}</div>
+          <h1>{b.pausedTitle}</h1>
+          <p className="muted">{b.pausedHint}</p>
           <button type="button" className="btn btn--primary" onClick={() => setPaused(false)}>
-            Продолжить
+            {b.resume}
           </button>
         </div>
       )}
 
       {dialog === 'menu' && (
-        <Sheet title="Пульт ведущего" onClose={() => setDialog(null)}>
+        <Sheet title={b.console} onClose={() => setDialog(null)}>
           <div className="tabs" role="tablist">
             <button type="button" role="tab" aria-selected={tab === 'players'} onClick={() => setTab('players')}>
-              Игроки
+              {b.tabPlayers}
             </button>
             <button type="button" role="tab" aria-selected={tab === 'game'} onClick={() => setTab('game')}>
-              Партия
+              {b.tabGame}
             </button>
           </div>
 
           {tab === 'players' ? (
             <>
-              <p className="list__sub">Нажмите на игрока: сменить номер, исправить имя{editable && ', удалить'}. Роли здесь не видны.</p>
+              <p className="list__sub">{b.playersHint(editable)}</p>
               <div className="list">
                 {state.players.map((p) => (
                   <button type="button" key={p.id} className="list__row player-row" onClick={() => setDialog({ player: p.id })}>
@@ -190,23 +192,23 @@ export function GameBar() {
           ) : (
             <div className="list">
               <button type="button" className="sheet__item" onClick={() => setDialog('rules')}>
-                <IconFlag /> Правила этой партии
+                <IconFlag /> {b.rules}
               </button>
               <button type="button" className="sheet__item" onClick={toggleSound}>
-                <IconSound off={!sound} /> Звук и вибрация: {sound ? 'вкл' : 'выкл'}
+                <IconSound off={!sound} /> {b.sound(sound)}
               </button>
               {!over && (
                 <>
                   <button type="button" className="sheet__item" onClick={() => setDialog('draw')}>
-                    <IconScale /> Объявить ничью
+                    <IconScale /> {b.draw}
                   </button>
                   <button type="button" className="sheet__item sheet__item--danger" onClick={() => setDialog('abort')}>
-                    <IconStop /> Прервать игру
+                    <IconStop /> {b.abort}
                   </button>
                 </>
               )}
               <button type="button" className="sheet__item" onClick={closeGame}>
-                <IconHome /> {over ? 'На главную' : 'На главную (игра сохранится)'}
+                <IconHome /> {b.home(over)}
               </button>
             </div>
           )}
@@ -228,9 +230,9 @@ export function GameBar() {
               <>
                 <button type="button" className="sheet__item" onClick={() => setDialog({ seat: selected.id })}>
                   <span className="mini-chip" aria-hidden="true">
-                    <span>№</span>
+                    <span>{t.num('')}</span>
                   </span>
-                  Сменить номер · сейчас №{selected.seat}
+                  {b.changeSeat(selected.seat)}
                 </button>
                 <button
                   type="button"
@@ -240,7 +242,7 @@ export function GameBar() {
                     setDialog({ rename: selected.id });
                   }}
                 >
-                  <IconPen /> Исправить имя
+                  <IconPen /> {b.rename}
                 </button>
               </>
             )}
@@ -255,42 +257,42 @@ export function GameBar() {
                       if (ok) {
                         useApp
                           .getState()
-                          .showToast(selected.fouls + 1 >= 4 ? `№${selected.seat} удалён (4-й фол)` : `Фол №${selected.seat}: ${selected.fouls + 1}`);
+                          .showToast(b.foulGiven(selected.seat, selected.fouls + 1));
                       }
                     }}
                   >
-                    <IconFlag /> Фол · сейчас {selected.fouls}
+                    <IconFlag /> {b.foul(selected.fouls)}
                   </button>
                 )}
                 <button type="button" className="sheet__item" onClick={() => setDialog({ confirmRemove: selected, cause: 'left' })}>
-                  <IconDoor /> Игрок покинул игру
+                  <IconDoor /> {b.left}
                 </button>
                 <button
                   type="button"
                   className="sheet__item sheet__item--danger"
                   onClick={() => setDialog({ confirmRemove: selected, cause: 'removed' })}
                 >
-                  <IconBan /> Удалить за нарушение
+                  <IconBan /> {b.remove}
                 </button>
               </>
             )}
           </div>
-          {over && <p className="list__sub">Игра окончена — изменения недоступны. Отменить финал можно кнопкой ↶.</p>}
+          {over && <p className="list__sub">{b.overNote}</p>}
           <button type="button" className="btn btn--secondary" onClick={() => setDialog('menu')}>
-            К списку игроков
+            {b.backToList}
           </button>
         </Sheet>
       )}
 
       {seatFor && (
         <SeatPicker
-          title={`Номер: ${seatFor.name}`}
+          title={b.seatTitle(seatFor.name)}
           current={seatFor.seat}
-          hint="Номер — только метка игрока, на очерёдность не влияет. Занятые номера недоступны."
+          hint={b.seatHint}
           takenBy={(n) => state.players.find((x) => x.seat === n && x.id !== seatFor.id)?.name ?? null}
           onPick={(n) => {
             if (n !== seatFor.seat && dispatch({ type: 'ChangeSeat', playerId: seatFor.id, seat: n })) {
-              useApp.getState().showToast(`${seatFor.name}: теперь №${n}`);
+              useApp.getState().showToast(b.seatChanged(seatFor.name, n));
             }
             setDialog({ player: seatFor.id });
           }}
@@ -299,12 +301,12 @@ export function GameBar() {
       )}
 
       {renameFor && (
-        <Sheet title={`Имя: №${renameFor.seat}`} onClose={() => setDialog({ player: renameFor.id })}>
+        <Sheet title={b.renameTitle(renameFor.seat)} onClose={() => setDialog({ player: renameFor.id })}>
           <form
             style={{ display: 'grid', gap: 12 }}
             onSubmit={(e) => {
               e.preventDefault();
-              if (dispatch({ type: 'RenamePlayer', playerId: renameFor.id, name: draft })) setDialog({ player: renameFor.id });
+              if (dispatch({ type: 'RenamePlayer', playerId: renameFor.id, name: draft.trim() || t.defaultName(renameFor.seat) })) setDialog({ player: renameFor.id });
             }}
           >
             <input
@@ -313,15 +315,15 @@ export function GameBar() {
               maxLength={MAX_NAME_LENGTH}
               autoFocus
               onChange={(e) => setDraft(e.target.value)}
-              aria-label="Имя игрока"
+              aria-label={b.renameAria}
             />
-            <p className="list__sub">Имя меняется только в этой партии. Профиль в базе — на главном экране, раздел «Игроки».</p>
+            <p className="list__sub">{b.renameNote}</p>
             <div className="actions__row">
               <button type="button" className="btn btn--secondary" onClick={() => setDialog({ player: renameFor.id })}>
-                Отмена
+                {t.common.cancel}
               </button>
               <button type="submit" className="btn btn--primary btn--plain">
-                Сохранить
+                {t.common.save}
               </button>
             </div>
           </form>
@@ -330,9 +332,9 @@ export function GameBar() {
 
       {dialog === 'undo' && (
         <Confirm
-          title="Отменить действие?"
-          text="Отмена вернёт игру в предыдущую фазу. Если там нужно что-то сказать игрокам, скажите это заново."
-          okLabel="Отменить"
+          title={b.undoTitle}
+          text={b.undoText}
+          okLabel={b.undoOk}
           onOk={() => {
             undo();
             setDialog(null);
@@ -342,23 +344,23 @@ export function GameBar() {
       )}
 
       {dialog === 'rules' && (
-        <Sheet title="Правила этой партии" onClose={() => setDialog(null)}>
-          <p>{firstNightBrief(state.settings)}</p>
+        <Sheet title={b.rules} onClose={() => setDialog(null)}>
+          <p>{firstNightBrief(state.settings, t.code)}</p>
           {Object.entries(state.composition).filter(([, count]) => count > 0).map(([role]) => (
             <section key={role} className="host-role-brief">
-              <h3>{ROLE_NAME[role as keyof typeof ROLE_NAME]}</h3>
-              <RoleBrief role={role as keyof typeof ROLE_NAME} settings={state.settings} />
+              <h3>{t.roles.name[role as Role]}</h3>
+              <RoleBrief role={role as Role} settings={state.settings} />
             </section>
           ))}
-          <button type="button" className="btn btn--secondary" onClick={() => setDialog('menu')}>Назад в пульт</button>
+          <button type="button" className="btn btn--secondary" onClick={() => setDialog('menu')}>{b.rulesBack}</button>
         </Sheet>
       )}
 
       {dialog === 'draw' && (
         <Confirm
-          title="Объявить ничью?"
-          text="Игра закончится ничьей. Это можно отменить кнопкой «Отменить»."
-          okLabel="Ничья"
+          title={b.drawTitle}
+          text={b.drawText}
+          okLabel={b.drawOk}
           onOk={() => {
             dispatch({ type: 'EndGame', result: 'draw' });
             setDialog(null);
@@ -369,9 +371,9 @@ export function GameBar() {
 
       {dialog === 'abort' && (
         <Confirm
-          title="Прервать игру?"
-          text="Игра закончится без победителя."
-          okLabel="Прервать"
+          title={b.abortTitle}
+          text={b.abortText}
+          okLabel={b.abortOk}
           danger
           onOk={() => {
             dispatch({ type: 'EndGame', result: 'aborted' });
@@ -383,9 +385,9 @@ export function GameBar() {
 
       {dialog && typeof dialog === 'object' && 'confirmRemove' in dialog && (
         <Confirm
-          title={dialog.cause === 'left' ? `№${dialog.confirmRemove.seat} покидает игру?` : `Удалить №${dialog.confirmRemove.seat}?`}
-          text="Игрок выбывает сразу, без последнего слова."
-          okLabel={dialog.cause === 'left' ? 'Покинул' : 'Удалить'}
+          title={dialog.cause === 'left' ? b.leaveTitle(dialog.confirmRemove.seat) : b.removeTitle(dialog.confirmRemove.seat)}
+          text={b.removeText}
+          okLabel={dialog.cause === 'left' ? b.leaveOk : b.removeOk}
           danger
           onOk={() => {
             dispatch({ type: 'RemovePlayer', playerId: dialog.confirmRemove.id, cause: dialog.cause });

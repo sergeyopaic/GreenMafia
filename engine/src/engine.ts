@@ -31,7 +31,7 @@ function createState(e: CreateGameEvent): GameState {
   const settings = withDefaults(e.settings);
   const n = e.players.length;
   if (n < MIN_PLAYERS || n > MAX_PLAYERS) {
-    fail('players.range', `Игроков должно быть от ${MIN_PLAYERS} до ${MAX_PLAYERS}`);
+    fail('players.range', `Игроков должно быть от ${MIN_PLAYERS} до ${MAX_PLAYERS}`, { min: MIN_PLAYERS, max: MAX_PLAYERS });
   }
   const ids = new Set(e.players.map((p) => p.id));
   if (ids.size !== n || e.players.some((p) => !p.id)) fail('players.ids', 'У игроков должны быть разные id');
@@ -46,15 +46,15 @@ function createState(e: CreateGameEvent): GameState {
     if (given.some((s) => s === undefined)) fail('players.seats', 'Укажите номер каждого игрока');
     seats = given as number[];
     if (seats.some((s) => !Number.isInteger(s) || s < 1 || s > MAX_SEAT)) {
-      fail('players.seatRange', `Номера мест — от 1 до ${MAX_SEAT}`);
+      fail('players.seatRange', `Номера мест — от 1 до ${MAX_SEAT}`, { max: MAX_SEAT });
     }
     const dup = seats.find((s, i) => seats.indexOf(s) !== i);
-    if (dup !== undefined) fail('players.seatDup', `Номер ${dup} занят дважды`);
+    if (dup !== undefined) fail('players.seatDup', `Номер ${dup} занят дважды`, { seat: dup });
   }
 
   const check = validateComposition(n, e.composition);
   const firstError = check.errors[0];
-  if (firstError) fail(firstError.code, firstError.message);
+  if (firstError) fail(firstError.code, firstError.message, firstError.params);
 
   const pool: Role[] = ROLES.flatMap((r) => Array<Role>(e.composition[r]).fill(r));
   let roles: Role[];
@@ -146,7 +146,7 @@ export function applyEvent(prev: GameState | null, event: GameEvent): GameState 
       break;
     default: {
       const never: never = event;
-      fail('event.unknown', `Неизвестное событие ${(never as GameEvent).type}`);
+      fail('event.unknown', `Неизвестное событие ${(never as GameEvent).type}`, { type: (never as GameEvent).type });
     }
   }
   return state;
@@ -184,7 +184,7 @@ function removePlayer(state: GameState, id: string, cause: 'removed' | 'left'): 
   const ph = state.phase;
   if (ph.t === 'reveal') fail('remove.reveal', 'Дождитесь окончания раздачи ролей');
   const p = getPlayer(state, id);
-  if (!p.alive) fail('remove.dead', `${label(p)} уже выбыл`);
+  if (!p.alive) fail('remove.dead', `${label(p)} уже выбыл`, { seat: p.seat });
 
   const isNight = ph.t === 'night';
   const number = 'number' in ph ? ph.number : 0;
@@ -205,7 +205,7 @@ function foul(state: GameState, id: string): void {
   if (!state.settings.fouls) fail('foul.off', 'Фолы выключены в настройках');
   if (state.phase.t === 'reveal') fail('foul.reveal', 'Дождитесь окончания раздачи ролей');
   const p = getPlayer(state, id);
-  if (!p.alive) fail('foul.dead', `${label(p)} уже выбыл`);
+  if (!p.alive) fail('foul.dead', `${label(p)} уже выбыл`, { seat: p.seat });
   p.fouls += 1;
   if (p.fouls === 3) p.skipNextSpeech = true;
   if (p.fouls >= 4) removePlayer(state, id, 'removed');
@@ -217,27 +217,29 @@ export const MAX_NAME_LENGTH = 20;
 
 function changeSeat(state: GameState, id: string, seat: number): void {
   const p = getPlayer(state, id);
-  if (!Number.isInteger(seat) || seat < 1 || seat > MAX_SEAT) fail('seat.range', `Номера мест — от 1 до ${MAX_SEAT}`);
+  if (!Number.isInteger(seat) || seat < 1 || seat > MAX_SEAT) fail('seat.range', `Номера мест — от 1 до ${MAX_SEAT}`, { max: MAX_SEAT });
   const holder = state.players.find((x) => x.seat === seat && x.id !== id);
-  if (holder) fail('seat.taken', `Номер ${seat} уже у игрока ${holder.name}`);
+  if (holder) fail('seat.taken', `Номер ${seat} уже у игрока ${holder.name}`, { seat, name: holder.name });
   p.seat = seat;
 }
 
 function renamePlayer(state: GameState, id: string, name: string): void {
   const p = getPlayer(state, id);
   const clean = name.trim().replace(/\s+/g, ' ');
-  if (clean.length > MAX_NAME_LENGTH) fail('name.long', `Имя — не длиннее ${MAX_NAME_LENGTH} символов`);
+  if (clean.length > MAX_NAME_LENGTH) fail('name.long', `Имя — не длиннее ${MAX_NAME_LENGTH} символов`, { max: MAX_NAME_LENGTH });
   const next = clean || `Игрок ${p.seat}`;
   const key = next.toLocaleLowerCase('ru-RU');
   const same = state.players.find((x) => x.id !== id && x.name.toLocaleLowerCase('ru-RU') === key);
-  if (same) fail('name.taken', `Имя «${same.name}» уже у №${same.seat}`);
+  if (same) fail('name.taken', `Имя «${same.name}» уже у №${same.seat}`, { name: same.name, seat: same.seat });
   p.name = next;
 }
 
 // ---------- Public API ----------
 
 function toError(err: unknown): EngineError {
-  if (err instanceof RuleError) return { code: err.code, message: err.message };
+  if (err instanceof RuleError) {
+    return err.params ? { code: err.code, message: err.message, params: err.params } : { code: err.code, message: err.message };
+  }
   throw err;
 }
 

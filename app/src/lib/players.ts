@@ -40,12 +40,30 @@ export function findByName(profiles: readonly PlayerProfile[], name: string): Pl
   return key ? profiles.find((p) => normalizeName(p.name) === key) : undefined;
 }
 
+/** Messages of the player base (the app passes the current language; Russian by default). */
+export interface PlayerTexts {
+  enterName: string;
+  exists: (name: string) => string;
+  twice: (name: string) => string;
+}
+
+const RU_TEXTS: PlayerTexts = {
+  enterName: 'Введите имя',
+  exists: (name) => `${name} уже есть в базе`,
+  twice: (name) => `${name} записан за столом дважды`,
+};
+
 /** Why a name cannot be used for a new or renamed profile, or null. */
-export function nameError(profiles: readonly PlayerProfile[], name: string, selfId?: string): string | null {
+export function nameError(
+  profiles: readonly PlayerProfile[],
+  name: string,
+  selfId?: string,
+  texts: PlayerTexts = RU_TEXTS,
+): string | null {
   const clean = cleanName(name);
-  if (!clean) return 'Введите имя';
+  if (!clean) return texts.enterName;
   const same = findByName(profiles, clean);
-  if (same && same.id !== selfId) return `${same.name} уже есть в базе`;
+  if (same && same.id !== selfId) return texts.exists(same.name);
   return null;
 }
 
@@ -58,6 +76,7 @@ export function resolveSeats(
   names: readonly string[],
   profiles: readonly PlayerProfile[],
   now = Date.now(),
+  texts: PlayerTexts = RU_TEXTS,
 ): { players: { id: string; name: string }[]; created: PlayerProfile[]; error: string | null } {
   const created: PlayerProfile[] = [];
   const used = new Set<string>();
@@ -74,7 +93,7 @@ export function resolveSeats(
       created.push(profile);
     }
     if (used.has(profile.id)) {
-      return { players: [], created: [], error: `${profile.name} записан за столом дважды` };
+      return { players: [], created: [], error: texts.twice(profile.name) };
     }
     used.add(profile.id);
     players.push({ id: profile.id, name: profile.name });

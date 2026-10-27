@@ -1,4 +1,5 @@
 import { MAX_SEAT, type Player } from '@greenmafia/engine';
+import { useT } from '../i18n';
 import { Chip } from './Chip';
 import { Sheet } from './Sheet';
 
@@ -9,7 +10,7 @@ export function SeatPicker({
   takenBy,
   onPick,
   onClose,
-  hint = 'Выберите номер, как на карточке игрока. Занятые номера недоступны.',
+  hint,
 }: {
   title: string;
   /** Current number of this player, or 0 if none. */
@@ -20,10 +21,11 @@ export function SeatPicker({
   onClose: () => void;
   hint?: string;
 }) {
+  const t = useT();
   return (
     <Sheet title={title} onClose={onClose}>
-      <p className="muted">{hint}</p>
-      <div className="chips chips--5 seat-grid" role="group" aria-label="Номера 1–20">
+      <p className="muted">{hint ?? t.setup.seatPickerHint}</p>
+      <div className="chips chips--5 seat-grid" role="group" aria-label={t.setup.seatPickerAria}>
         {Array.from({ length: MAX_SEAT }, (_, k) => k + 1).map((n) => {
           const holder = takenBy(n);
           const chip: Player = { id: `seat${n}`, seat: n, name: '', role: 'civilian', alive: true, death: null, fouls: 0, skipNextSpeech: false };
@@ -31,14 +33,14 @@ export function SeatPicker({
             <Chip
               key={n}
               player={chip}
-              look={{ selected: n === current, disabled: !!holder, inert: !!holder, tag: holder ?? (n === current ? 'сейчас' : '') }}
+              look={{ selected: n === current, disabled: !!holder, inert: !!holder, tag: holder ?? (n === current ? t.setup.seatNow : '') }}
               onClick={() => onPick(n)}
             />
           );
         })}
       </div>
       <button type="button" className="btn btn--secondary" onClick={onClose}>
-        Отмена
+        {t.common.cancel}
       </button>
     </Sheet>
   );

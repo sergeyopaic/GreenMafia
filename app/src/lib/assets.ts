@@ -33,7 +33,9 @@ export type StampKind =
   | 'no-answer'
   | 'checked-commissar'
   | 'checked-not-commissar';
-export const stampImage = (kind: StampKind) => asset(`stamps/${kind}`);
+/** Stamps carry text, so each language has its own set: `stamps/<kind>` (Russian) and `stamps/en/<kind>`. */
+export const stampImage = (kind: StampKind, lang: 'ru' | 'en' = 'ru') =>
+  lang === 'en' ? asset(`stamps/en/${kind}`) : asset(`stamps/${kind}`);
 
 /** Puts texture URLs into CSS variables; missing textures fall back to the CSS noise. */
 export function applyTextures(): void {

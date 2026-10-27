@@ -1,4 +1,5 @@
 import { GameBar } from '../components/GameBar';
+import { useT } from '../i18n';
 import { useApp, useGame } from '../store';
 import { GameOverScreen } from './game/GameOver';
 import { MorningScreen } from './game/Morning';
@@ -10,6 +11,7 @@ import { VotingScreen } from './game/Voting';
 
 export function GameScreen() {
   const state = useGame();
+  const t = useT();
   const handBackAck = useApp((s) => s.handBackAck);
   const ackHandBack = useApp((s) => s.ackHandBack);
   const ph = state.phase;
@@ -31,11 +33,11 @@ export function GameScreen() {
 
       {needHandBack && (
         <div className="overlay">
-          <div className="eyebrow">роли розданы</div>
-          <h1>Верните телефон ведущему</h1>
-          <p className="muted">Дальше экран видит только ведущий.</p>
+          <div className="eyebrow">{t.game.dealt}</div>
+          <h1>{t.game.handBack}</h1>
+          <p className="muted">{t.game.handBackHint}</p>
           <button type="button" className="btn btn--primary" onClick={ackHandBack}>
-            Телефон у ведущего
+            {t.game.handBackOk}
           </button>
         </div>
       )}

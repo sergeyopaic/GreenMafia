@@ -1,48 +1,50 @@
 import { type ActionStep, type GameState, type NightRecord, isMafiaTeam } from '@greenmafia/engine';
-import { DEATH_CAUSE, STEP_NAME, seat, verdictText } from '../lib/text';
+import { useT } from '../i18n';
 
 /** §9.5 — night by night, day by day. */
 export function Chronicle({ state }: { state: GameState }) {
+  const t = useT();
+  const c = t.chronicle;
   const byId = (id: string | null | undefined) => state.players.find((p) => p.id === id);
+  const seatOf = (id: string | null | undefined) => {
+    const p = byId(id);
+    return p ? t.num(p.seat) : '?';
+  };
   const label = (id: string | null | undefined) => {
     const p = byId(id);
-    return p ? `${seat(p)} ${p.name}` : '—';
+    return p ? `${t.num(p.seat)} ${p.name}` : '—';
   };
 
   const removals = (phase: 'night' | 'day', n: number) =>
     state.players.filter((p) => p.death && (p.death.cause === 'removed' || p.death.cause === 'left') && p.death.phase === phase && p.death.number === n);
 
   function nightLines(night: NightRecord): [string, string][] {
-    if (night.kind === 'meeting') return [['Знакомство', 'мафия увидела друг друга']];
+    if (night.kind === 'meeting') return [[c.meeting, c.meetingText]];
     const rows: [string, string][] = [];
     for (const step of night.steps) {
       if (step === 'meeting') continue;
-      const c = night.choices[step as ActionStep];
+      const choice = night.choices[step as ActionStep];
       const client = byId(night.blocked);
       const clientActsHere =
         step !== 'lover' && !!client && (step === 'mafia' ? isMafiaTeam(client.role) : client.role === step);
       let text: string;
-      if (c === undefined) text = clientActsHere ? 'у любовницы — хода нет' : 'роль выбыла';
-      else if (c === null) text = step === 'mafia' ? 'промах' : 'пропуск';
-      else text = label(c);
-      if (step === 'mafia' && c !== undefined && clientActsHere) text += ` · ${seat(client!)} у любовницы`;
-      if (step === 'doctor' && c && night.saved.includes(c)) text += ' · спас';
-      if (step === 'commissar' && night.checkResult) {
-        text += ` · ${night.checkResult === 'mafia' ? 'мафия' : night.checkResult === 'notMafia' ? 'не мафия' : 'нет ответа'}`;
-      }
-      if (step === 'don' && night.donResult) {
-        text += ` · ${night.donResult === 'commissar' ? 'комиссар' : night.donResult === 'notCommissar' ? 'не комиссар' : 'нет ответа'}`;
-      }
-      rows.push([STEP_NAME[step], text]);
+      if (choice === undefined) text = clientActsHere ? c.blocked : c.roleOut;
+      else if (choice === null) text = step === 'mafia' ? c.miss : c.skip;
+      else text = label(choice);
+      if (step === 'mafia' && choice !== undefined && clientActsHere && client) text += c.clientBlocked(client.seat);
+      if (step === 'doctor' && choice && night.saved.includes(choice)) text += c.saved;
+      if (step === 'commissar' && night.checkResult) text += ` · ${c.check[night.checkResult]}`;
+      if (step === 'don' && night.donResult) text += ` · ${c.donCheck[night.donResult]}`;
+      rows.push([t.steps[step], text]);
     }
     rows.push([
-      'Итог',
+      c.result,
       night.deaths.length === 0
-        ? 'никто не погиб'
-        : night.deaths.map((d) => `${label(d.playerId)}${d.cause === 'loverLink' ? ' (вместе с любовницей)' : ''}`).join(', '),
+        ? c.nobodyDied
+        : night.deaths.map((d) => `${label(d.playerId)}${d.cause === 'loverLink' ? c.withLover : ''}`).join(', '),
     ]);
-    if (night.alibiFor) rows.push(['Алиби', label(night.alibiFor)]);
-    for (const p of removals('night', night.number)) rows.push(['Выбыл', `${label(p.id)} — ${DEATH_CAUSE[p.death!.cause]}`]);
+    if (night.alibiFor) rows.push([c.alibi, label(night.alibiFor)]);
+    for (const p of removals('night', night.number)) rows.push([c.out, `${label(p.id)} — ${t.death[p.death!.cause]}`]);
     return rows;
   }
 
@@ -50,34 +52,35 @@ export function Chronicle({ state }: { state: GameState }) {
   const maxN = Math.max(state.nights.length, state.days.length);
   for (let i = 0; i < maxN; i++) {
     const night = state.nights[i];
-    if (night) blocks.push({ title: `Ночь ${night.number}`, rows: nightLines(night) });
+    if (night) blocks.push({ title: c.night(night.number), rows: nightLines(night) });
     const day = state.days[i];
     if (day) {
       const rows: [string, string][] = [];
-      rows.push(['Начинал', label(day.firstSpeaker)]);
+      rows.push([c.opened, label(day.firstSpeaker)]);
       rows.push([
-        'Выставлены',
-        day.nominations.length ? day.nominations.map((n) => `${label(n.candidate)} (от ${seat(byId(n.by)!)})`).join(', ') : 'никто',
+        c.nominated,
+        day.nominations.length
+          ? day.nominations.map((n) => `${label(n.candidate)} ${c.by(byId(n.by)?.seat ?? 0)}`).join(', ')
+          : c.nobody,
       ]);
       for (const r of day.rounds) {
-        const name = r.kind === 'main' ? 'Голосование' : r.kind === 'revote' ? 'Переголосование' : 'Подъём всех';
         const text =
           r.kind === 'allOut'
-            ? `за ${r.counts.yes ?? 0} из ${r.eligible}`
+            ? c.allOutCount(r.counts.yes ?? 0, r.eligible)
             : r.candidates
-                .map((c) => {
-                  const voters = r.voters?.[c];
-                  return `${seat(byId(c)!)} — ${r.counts[c] ?? 0}${voters && voters.length ? ` (${voters.map((v) => seat(byId(v)!)).join(' ')})` : ''}`;
+                .map((cand) => {
+                  const voters = r.voters?.[cand];
+                  return `${seatOf(cand)} — ${r.counts[cand] ?? 0}${voters && voters.length ? ` (${voters.map(seatOf).join(' ')})` : ''}`;
                 })
-                .join('; ') + (r.forced ? ` · ${r.forced} молчащих голосов последнему` : '');
-        rows.push([name, text]);
+                .join('; ') + (r.forced ? c.forcedNote(r.forced) : '');
+        rows.push([c.round[r.kind] ?? r.kind, text]);
       }
       if (day.verdict) {
-        const out = day.eliminated.map((id) => byId(id)!).filter(Boolean);
-        rows.push(['Итог', verdictText(day.verdict, out)]);
+        const out = day.eliminated.map((id) => byId(id)).filter((p): p is NonNullable<typeof p> => !!p);
+        rows.push([c.result, t.verdict(day.verdict, out)]);
       }
-      for (const p of removals('day', day.number)) rows.push(['Выбыл', `${label(p.id)} — ${DEATH_CAUSE[p.death!.cause]}`]);
-      blocks.push({ title: `День ${day.number}`, rows });
+      for (const p of removals('day', day.number)) rows.push([c.out, `${label(p.id)} — ${t.death[p.death!.cause]}`]);
+      blocks.push({ title: c.day(day.number), rows });
     }
   }
 

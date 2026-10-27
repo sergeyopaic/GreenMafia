@@ -1,5 +1,6 @@
 import type { Player } from '@greenmafia/engine';
 import type { ReactNode } from 'react';
+import { useT } from '../i18n';
 
 export interface ChipLook {
   selected?: boolean;
@@ -26,6 +27,7 @@ export function Chip({
   look?: ChipLook;
   onClick?: (p: Player) => void;
 }) {
+  const t = useT();
   const cls = [
     'chip',
     look.selected && 'is-selected',
@@ -39,20 +41,21 @@ export function Chip({
   ]
     .filter(Boolean)
     .join(' ');
-  const statuses = [!player.alive && 'выбыл', look.actor && 'ходит', look.speaker && 'говорит', look.candidate && 'кандидат', look.alibi && 'алиби', look.selected && 'выбран', look.tag].filter(Boolean);
+  const c = t.chip;
+  const statuses = [!player.alive && c.out, look.actor && c.acting, look.speaker && c.speaking, look.candidate && c.candidate, look.alibi && c.alibi, look.selected && c.selected, look.tag].filter(Boolean);
   return (
     <button
       type="button"
       className={cls}
       disabled={look.inert || !onClick}
       aria-pressed={look.selected ?? undefined}
-      aria-label={`№${player.seat}, ${player.name}${statuses.length ? `, ${statuses.join(', ')}` : ''}`}
+      aria-label={`${t.num(player.seat)}, ${player.name}${statuses.length ? `, ${statuses.join(', ')}` : ''}`}
       onClick={() => onClick?.(player)}
     >
       <span className="chip__disc">
         <span className="chip__num">{player.seat}</span>
         {(look.selected || look.speaker || look.alibi || look.candidate) && player.alive && (
-          <span className="chip__status" aria-hidden="true">{look.selected ? '✓' : look.speaker ? '…' : look.alibi ? 'А' : '!'}</span>
+          <span className="chip__status" aria-hidden="true">{look.selected ? '✓' : look.speaker ? '…' : look.alibi ? c.alibiMark : '!'}</span>
         )}
       </span>
       {look.badge !== undefined && look.badge !== null && (
@@ -61,7 +64,7 @@ export function Chip({
         </span>
       )}
       <span className="chip__name">{player.name}</span>
-      <span className="chip__tag">{look.tag || (look.actor ? 'ходит' : look.speaker ? 'говорит' : look.alibi ? 'алиби' : look.candidate ? 'кандидат' : '')}</span>
+      <span className="chip__tag">{look.tag || (look.actor ? c.acting : look.speaker ? c.speaking : look.alibi ? c.alibi : look.candidate ? c.candidate : '')}</span>
     </button>
   );
 }
@@ -75,8 +78,9 @@ export function ChipGrid({
   look?: (p: Player) => ChipLook;
   onPick?: (p: Player) => void;
 }) {
+  const t = useT();
   return (
-    <div className={`chips${players.length > 12 ? ' chips--large' : ''}`} role="group" aria-label="Игроки">
+    <div className={`chips${players.length > 12 ? ' chips--large' : ''}`} role="group" aria-label={t.chip.players}>
       {players.map((p) => (
         <Chip key={p.id} player={p} look={look?.(p)} onClick={onPick} />
       ))}
@@ -85,8 +89,9 @@ export function ChipGrid({
 }
 
 export function MiniChip({ player }: { player: Pick<Player, 'seat'> }) {
+  const t = useT();
   return (
-    <span className="mini-chip" aria-label={`№${player.seat}`}>
+    <span className="mini-chip" aria-label={t.num(player.seat)}>
       <span>{player.seat}</span>
     </span>
   );

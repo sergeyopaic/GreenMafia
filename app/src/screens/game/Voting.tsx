@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { ChipGrid, MiniChip } from '../../components/Chip';
 import { TypeLine } from '../../components/TypeLine';
 import { play } from '../../lib/sound';
-import { SCRIPT, plural, seat, seats } from '../../lib/text';
+import { useT } from '../../i18n';
 import { useApp, useGame } from '../../store';
 
 export function VotingScreen() {
@@ -27,6 +27,8 @@ function useVotingBasics() {
 
 function CandidateRound() {
   const { state, ph, eligible, eligibleIds, byId } = useVotingBasics();
+  const t = useT();
+  const v = t.voting;
   const dispatch = useApp((s) => s.dispatch);
   const candidates = (ph?.candidates ?? []).map(byId);
   const [votes, setVotes] = useState<Record<string, string[]>>(() => Object.fromEntries(candidates.map((c) => [c.id, []])));
@@ -55,7 +57,7 @@ function CandidateRound() {
     if (!current || !eligibleIds.has(p.id)) return;
     const holder = owner.get(p.id);
     if (holder && holder !== current.id) {
-      useApp.getState().showToast(`${seat(p)} уже голосует за ${seat(byId(holder))}`);
+      useApp.getState().showToast(v.alreadyVotes(p.seat, byId(holder).seat));
       return;
     }
     setVotes((v) => {
@@ -77,10 +79,10 @@ function CandidateRound() {
   const intro =
     ph.kind === 'main'
       ? page === 0
-        ? `${SCRIPT.voteStart(candidates)} `
+        ? `${t.script.voteStart(candidates)} `
         : ''
       : page === 0
-        ? `Переголосование: только ${seats(candidates)}. `
+        ? t.script.revoteIntro(candidates)
         : '';
 
   // Outcome preview for the host.
@@ -97,20 +99,18 @@ function CandidateRound() {
           </button>
         ))}
         <button type="button" aria-pressed={summary} onClick={() => setPage(candidates.length)}>
-          итоги
+          {v.summaryTab}
         </button>
       </div>
 
       {!summary && current && (
         <>
-          <TypeLine text={intro + SCRIPT.voteCandidate(current)} />
+          <TypeLine text={intro + t.script.voteCandidate(current)} />
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
             <div>
-              <div className="eyebrow">
-                кандидат {page + 1} из {candidates.length}
-              </div>
+              <div className="eyebrow">{v.candidateOf(page + 1, candidates.length)}</div>
               <h2>
-                {seat(current)} · {current.name}
+                {t.num(current.seat)} · {current.name}
               </h2>
             </div>
             <div className="tally__count" style={{ fontSize: 44 }}>
@@ -137,7 +137,7 @@ function CandidateRound() {
                   disabled: !eligibleIds.has(p.id) || !!elsewhere,
                   inert: !eligibleIds.has(p.id),
                   candidate: p.id === current.id,
-                  tag: elsewhere ? `→${seat(byId(holder))}` : mine ? 'голос учтён' : p.id === current.id ? 'кандидат' : !p.alive ? '' : !eligibleIds.has(p.id) ? 'алиби' : '',
+                  tag: elsewhere ? `→${t.num(byId(holder).seat)}` : mine ? v.tagCounted : p.id === current.id ? v.tagCandidate : !p.alive ? '' : !eligibleIds.has(p.id) ? v.tagAlibi : '',
                 };
               }}
               onPick={toggle}
@@ -148,7 +148,7 @@ function CandidateRound() {
 
       {summary && (
         <>
-          <h2>Итоги {ph.kind === 'main' ? 'голосования' : 'переголосования'}</h2>
+          <h2>{v.summaryTitle(ph.kind === 'main')}</h2>
           <div className="tally">
             {finals.map(({ c, n }, i) => {
               const forced = !abstain && i === candidates.length - 1 ? silent : 0;
@@ -166,35 +166,32 @@ function CandidateRound() {
             })}
           </div>
           <p className="list__sub">
-            Голосующих: {eligible.length}. {abstain ? `Воздержались: ${silent}.` : silent > 0 ? `${silent} ${plural(silent, 'молчащий голос уходит', 'молчащих голоса уходят', 'молчащих голосов уходят')} последнему кандидату.` : ''}
+            {v.voters(eligible.length)}
+            {abstain ? v.abstained(silent) : silent > 0 ? v.forced(silent) : ''}
           </p>
           <div className="notice notice--host">
-            {leaders.length === 0
-              ? 'Голосов нет — никто не выбывает.'
-              : leaders.length === 1
-                ? `Выбывает ${seat(leaders[0]!)}.`
-                : `Ничья между ${seats(leaders)}.`}
+            {leaders.length === 0 ? v.noVotes : leaders.length === 1 ? v.out(leaders[0]!.seat) : v.tie(leaders)}
           </div>
         </>
       )}
 
       <div className="actions">
         <button type="button" className="btn btn--ghost" style={{ alignSelf: 'center', minHeight: 32 }} onClick={() => setQuick((q) => !q)}>
-          {quick ? 'отмечать голосующих по фишкам' : 'ввести числом'}
+          {quick ? v.byChips : v.byNumber}
         </button>
         <div className="actions__row">
           {page > 0 && (
             <button type="button" className="btn btn--secondary" onClick={() => setPage((p) => p - 1)}>
-              Назад
+              {t.common.back}
             </button>
           )}
           {summary ? (
             <button type="button" className="btn btn--primary" onClick={submit}>
-              Подсчитать
+              {v.count}
             </button>
           ) : (
             <button type="button" className="btn btn--primary" onClick={() => setPage((p) => p + 1)}>
-              {page === candidates.length - 1 ? 'Итоги' : 'Следующий кандидат'}
+              {v.next(page === candidates.length - 1)}
             </button>
           )}
         </div>
@@ -204,14 +201,15 @@ function CandidateRound() {
 }
 
 function QuickCount({ value, max, onChange }: { value: number; max: number; onChange: (n: number) => void }) {
+  const t = useT();
   return (
     <div className="folder" style={{ display: 'flex', justifyContent: 'center' }}>
       <div className="stepper">
-        <button type="button" disabled={value <= 0} onClick={() => onChange(value - 1)} aria-label="Меньше">
+        <button type="button" disabled={value <= 0} onClick={() => onChange(value - 1)} aria-label={t.common.less}>
           −
         </button>
         <output style={{ fontSize: 48, minWidth: 80 }}>{value}</output>
-        <button type="button" disabled={value >= max} onClick={() => onChange(value + 1)} aria-label="Больше">
+        <button type="button" disabled={value >= max} onClick={() => onChange(value + 1)} aria-label={t.common.more}>
           +
         </button>
       </div>
@@ -223,6 +221,8 @@ function QuickCount({ value, max, onChange }: { value: number; max: number; onCh
 
 function AllOutRound() {
   const { state, ph, eligible, eligibleIds, byId } = useVotingBasics();
+  const t = useT();
+  const v = t.voting;
   const dispatch = useApp((s) => s.dispatch);
   const [yes, setYes] = useState<string[]>([]);
   const [quick, setQuick] = useState(false);
@@ -234,16 +234,16 @@ function AllOutRound() {
 
   return (
     <main className="screen">
-      <TypeLine text={SCRIPT.voteAllOut(tied)} />
+      <TypeLine text={t.script.voteAllOut(tied)} />
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <div>
-          <div className="eyebrow">подъём всех</div>
-          <h2>За: {n}</h2>
+          <div className="eyebrow">{v.allOut}</div>
+          <h2>{v.forCount(n)}</h2>
         </div>
         <div className="list__sub" style={{ textAlign: 'right' }}>
-          нужно {need} из {eligible.length}
+          {v.need(need, eligible.length)}
           <br />
-          {n >= need ? `выбывают ${seats(tied)}` : 'никто не выбывает'}
+          {v.allOutResult(n >= need, tied)}
         </div>
       </div>
       {quick ? (
@@ -256,7 +256,7 @@ function AllOutRound() {
             disabled: !eligibleIds.has(p.id),
             inert: !eligibleIds.has(p.id),
             candidate: ph.candidates.includes(p.id),
-            tag: yes.includes(p.id) ? 'за подъём' : !p.alive ? '' : !eligibleIds.has(p.id) ? 'не голосует' : '',
+            tag: yes.includes(p.id) ? v.tagFor : !p.alive ? '' : !eligibleIds.has(p.id) ? v.tagNoVote : '',
           })}
           onPick={(p) => {
             if (!eligibleIds.has(p.id)) return;
@@ -266,14 +266,14 @@ function AllOutRound() {
       )}
       <div className="actions">
         <button type="button" className="btn btn--ghost" style={{ alignSelf: 'center', minHeight: 32 }} onClick={() => setQuick((q) => !q)}>
-          {quick ? 'отмечать по фишкам' : 'ввести числом'}
+          {quick ? v.byChipsShort : v.byNumber}
         </button>
         <button
           type="button"
           className="btn btn--primary btn--block"
           onClick={() => dispatch(quick ? { type: 'CastVotes', counts: { yes: count } } : { type: 'CastVotes', voters: { yes } })}
         >
-          Подсчитать
+          {v.count}
         </button>
       </div>
     </main>

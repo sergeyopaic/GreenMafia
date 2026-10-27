@@ -4,7 +4,7 @@ import { Chip, ChipGrid, MiniChip } from '../../components/Chip';
 import { PlayerPicker } from '../../components/Sheet';
 import { Timer } from '../../components/Timer';
 import { TypeLine } from '../../components/TypeLine';
-import { SCRIPT, seat } from '../../lib/text';
+import { useT } from '../../i18n';
 import { useApp, useGame } from '../../store';
 
 function Speaker({ player, caption }: { player: Player; caption: string }) {
@@ -23,6 +23,7 @@ function Speaker({ player, caption }: { player: Player; caption: string }) {
 
 export function LastWordsScreen() {
   const state = useGame();
+  const t = useT();
   const dispatch = useApp((s) => s.dispatch);
   if (state.phase.t !== 'lastWords') return null;
   const { queue, then, number } = state.phase;
@@ -32,12 +33,12 @@ export function LastWordsScreen() {
 
   return (
     <main className="screen">
-      <Speaker player={player} caption={`последнее слово · №${player.seat}`} />
-      <TypeLine text={SCRIPT.lastWord(player)} />
+      <Speaker player={player} caption={t.speech.lastWordCaption(player.seat)} />
+      <TypeLine text={t.script.lastWord(player)} />
       <Timer key={`${number}-${player.id}`} seconds={state.settings.timers.lastWord} />
       <div className="actions">
         <button type="button" className="btn btn--primary btn--block" onClick={() => dispatch({ type: 'Proceed' })}>
-          {more ? 'Следующее последнее слово' : then === 'discussion' ? 'К обсуждению' : 'Наступает ночь'}
+          {t.speech.lastWordNext(more, then === 'discussion')}
         </button>
       </div>
     </main>
@@ -48,6 +49,8 @@ export function LastWordsScreen() {
 
 export function DiscussionScreen() {
   const state = useGame();
+  const t = useT();
+  const sp = t.speech;
   const dispatch = useApp((s) => s.dispatch);
   const [picking, setPicking] = useState(false);
   if (state.phase.t !== 'discussion') return null;
@@ -65,14 +68,14 @@ export function DiscussionScreen() {
 
   return (
     <main className="screen">
-      <Speaker player={speaker} caption={`речь ${position} из ${day.order.length} · №${speaker.seat}`} />
-      <TypeLine text={SCRIPT.speech(speaker)} />
+      <Speaker player={speaker} caption={sp.speechCaption(position, day.order.length, speaker.seat)} />
+      <TypeLine text={t.script.speech(speaker)} />
       <Timer key={`${day.number}-${speaker.id}`} seconds={state.settings.timers.speech} />
 
       <section className="folder">
-        <span className="folder__tab">выставлены</span>
+        <span className="folder__tab">{sp.nominated}</span>
         {candidates.length === 0 ? (
-          <p className="muted">Пока никого.</p>
+          <p className="muted">{sp.nobodyYet}</p>
         ) : (
           <div className="list">
             {day.nominations.map((n) => {
@@ -84,9 +87,9 @@ export function DiscussionScreen() {
                   <MiniChip player={c} />
                   <div className="list__main">
                     <span className="list__title">{c.name}</span>
-                    <span className="list__sub"> · выставил {seat(b)}</span>
+                    <span className="list__sub">{sp.nominatedBy(b.seat)}</span>
                   </div>
-                  {!c.alive && <span className="list__sub">выбыл</span>}
+                  {!c.alive && <span className="list__sub">{sp.out}</span>}
                 </div>
               );
             })}
@@ -101,30 +104,30 @@ export function DiscussionScreen() {
           speaker: p.id === speaker.id,
           candidate: candidates.includes(p.id),
           alibi: playerHasAlibi(state, p.id),
-          tag: candidates.includes(p.id) ? 'выставлен' : playerHasAlibi(state, p.id) ? 'алиби' : '',
+          tag: candidates.includes(p.id) ? sp.tagNominated : playerHasAlibi(state, p.id) ? sp.tagAlibi : '',
           badge: state.settings.fouls && p.fouls > 0 ? p.fouls : undefined,
           badgeTone: p.fouls >= 3 ? 'danger' : 'default',
         })}
       />
 
       <div className="actions">
-        {nominated && <div className="actions__hint">{seat(speaker)} выставил {seat(byId(nominated.candidate)!)}</div>}
+        {nominated && <div className="actions__hint">{sp.didNominate(speaker.seat, byId(nominated.candidate)?.seat ?? 0)}</div>}
         <div className="actions__row">
           {!nominated && (
             <button type="button" className="btn btn--secondary" disabled={!anyAllowed} onClick={() => setPicking(true)}>
-              Выставить…
+              {sp.nominate}
             </button>
           )}
           <button type="button" className="btn btn--primary" onClick={() => dispatch({ type: 'Proceed' })}>
-            {isLast ? 'Итоги обсуждения' : 'Следующий'}
+            {sp.nextSpeaker(isLast)}
           </button>
         </div>
       </div>
 
       {picking && (
         <PlayerPicker
-          title={`${seat(speaker)} выставляет…`}
-          hint="Кандидата можно выставить только во время своей речи, одного."
+          title={sp.pickTitle(speaker.seat)}
+          hint={sp.pickHint}
           players={state.players}
           allowed={(p) => options.find((o) => o.player.id === p.id)?.allowed ?? false}
           look={(p) => {
@@ -132,11 +135,11 @@ export function DiscussionScreen() {
             const tag = !p.alive
               ? ''
               : candidates.includes(p.id)
-                ? 'выставлен'
+                ? sp.tagNominated
                 : playerHasAlibi(state, p.id)
-                  ? 'алиби'
+                  ? sp.tagAlibi
                   : p.id === speaker.id && !o?.allowed
-                    ? 'сам'
+                    ? sp.tagSelf
                     : '';
             return { tag };
           }}
@@ -155,6 +158,7 @@ export function DiscussionScreen() {
 
 export function DefenseScreen() {
   const state = useGame();
+  const t = useT();
   const dispatch = useApp((s) => s.dispatch);
   if (state.phase.t !== 'defense') return null;
   const { queue, candidates, number } = state.phase;
@@ -166,12 +170,12 @@ export function DefenseScreen() {
 
   return (
     <main className="screen">
-      <Speaker player={player} caption={`защитная речь · ${candidates.length - queue.length + 1} из ${candidates.length}`} />
-      <TypeLine text={(first ? `${SCRIPT.voteTie(tied)} ` : '') + SCRIPT.defense(player)} />
+      <Speaker player={player} caption={t.speech.defenseCaption(candidates.length - queue.length + 1, candidates.length)} />
+      <TypeLine text={(first ? `${t.script.voteTie(tied)} ` : '') + t.script.defense(player)} />
       <Timer key={`${number}-${round}-${player.id}`} seconds={state.settings.timers.defense} />
       <div className="actions">
         <button type="button" className="btn btn--primary btn--block" onClick={() => dispatch({ type: 'Proceed' })}>
-          {queue.length > 1 ? 'Следующая защита' : 'К переголосованию'}
+          {t.speech.defenseNext(queue.length > 1)}
         </button>
       </div>
     </main>

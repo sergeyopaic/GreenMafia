@@ -23,6 +23,8 @@ export interface LastSetup {
 
 export interface Prefs {
   sound: boolean;
+  /** Interface language; absent = detect from the browser. */
+  lang?: 'ru' | 'en';
 }
 
 const K_CURRENT = 'gm.current';

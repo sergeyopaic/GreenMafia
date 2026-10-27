@@ -1,4 +1,5 @@
 import type { Role } from '@greenmafia/engine';
+import { useT } from '../i18n';
 import { roleArt } from '../lib/assets';
 import { RoleIcon } from './icons';
 
@@ -13,9 +14,10 @@ export function RoleArt({ role }: { role: Role | 'back' }) {
 }
 
 function RoleArtPlaceholder({ role }: { role: Role | 'back' }) {
+  const t = useT();
   const id = `hatch-${role}`;
   return (
-    <svg viewBox="0 0 200 260" preserveAspectRatio="xMidYMin meet" role="img" aria-label="Заглушка арта роли">
+    <svg viewBox="0 0 200 260" preserveAspectRatio="xMidYMin meet" role="img" aria-label={t.art.placeholderAria}>
       <defs>
         <pattern id={id} width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
           <rect width="8" height="8" fill="#0f2e21" />
@@ -39,7 +41,7 @@ function RoleArtPlaceholder({ role }: { role: Role | 'back' }) {
         </g>
       )}
       <text x="100" y="34" textAnchor="middle" fill="#b9d94a" fontFamily="Anonymous Pro" fontSize="9" letterSpacing="2.5">
-        ЗАГЛУШКА
+        {t.art.placeholder}
       </text>
       <text x="100" y="236" textAnchor="middle" fill="#9db0a3" fontFamily="Anonymous Pro" fontSize="8">
         src/assets/roles/{role} · 1024×1536

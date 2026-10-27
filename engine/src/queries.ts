@@ -1,5 +1,6 @@
 // Read-only helpers for the UI. They never change the state.
 
+import type { Reason } from './errors';
 import { currentSpeaker, eligibleVoters, hasAlibi, nominationError } from './day';
 import { currentNight, findPlayer } from './helpers';
 import { commissarResult, currentStep, donResult, isMafiaTeam, isStepBlocked, isStepFake, stepActors, targetError } from './night';
@@ -9,8 +10,8 @@ import type { CheckResult, Choice, DonCheckResult, GameState, NightStep, Player,
 export interface TargetOption {
   player: Player;
   allowed: boolean;
-  /** Why the target is not allowed. */
-  reason: string | null;
+  /** Why the target is not allowed (code + params for translation, Russian message). */
+  reason: Reason | null;
 }
 
 export interface NightStepView {
@@ -36,7 +37,7 @@ export function getNightStepView(state: GameState): NightStepView | null {
     step === 'meeting'
       ? []
       : state.players.map((p) => {
-          const reason = fake ? 'Роль выбыла' : targetError(state, step, p.id);
+          const reason: Reason | null = fake ? { code: 'target.fake', message: 'Роль выбыла' } : targetError(state, step, p.id);
           return { player: p, allowed: reason === null, reason };
         });
   return {

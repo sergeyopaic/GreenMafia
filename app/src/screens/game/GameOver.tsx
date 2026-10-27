@@ -5,11 +5,12 @@ import { MiniChip } from '../../components/Chip';
 import { RoleIcon } from '../../components/icons';
 import { Stamp } from '../../components/Stamp';
 import { play } from '../../lib/sound';
-import { DEATH_CAUSE, RESULT_LINE, RESULT_TITLE, ROLE_NAME, TEAM_NAME } from '../../lib/text';
+import { useT } from '../../i18n';
 import { randomSeed, useApp, useGame } from '../../store';
 
 /** Final report; also used read-only for archived games. */
 export function CaseFile({ state, animate = true }: { state: GameState; animate?: boolean }) {
+  const t = useT();
   const [tab, setTab] = useState<'roles' | 'chronicle'>('roles');
   if (state.phase.t !== 'gameOver') return null;
   const result = state.phase.result;
@@ -19,16 +20,16 @@ export function CaseFile({ state, animate = true }: { state: GameState; animate?
     <>
       <div className="closed">
         <Stamp kind="case-closed" big animate={animate} rotate={-6} />
-        <div className="closed__title">{RESULT_TITLE[result.winner]}</div>
-        <p className="muted">{RESULT_LINE[result.reason]}</p>
+        <div className="closed__title">{t.result.title[result.winner]}</div>
+        <p className="muted">{t.result.line[result.reason]}</p>
       </div>
 
       <div className="tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'roles'} onClick={() => setTab('roles')}>
-          Роли
+          {t.gameOver.roles}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'chronicle'} onClick={() => setTab('chronicle')}>
-          Хроника
+          {t.gameOver.chronicle}
         </button>
       </div>
 
@@ -40,12 +41,12 @@ export function CaseFile({ state, animate = true }: { state: GameState; animate?
               <div className="list__main">
                 <div className="list__title">{p.name}</div>
                 <div className="list__sub">
-                  {TEAM_NAME[ROLE_TEAM[p.role]]}
-                  {p.death ? ` · ${DEATH_CAUSE[p.death.cause]} (${p.death.phase === 'night' ? 'ночь' : 'день'} ${p.death.number})` : ' · дожил до конца'}
+                  {t.roles.team[ROLE_TEAM[p.role]]}
+                  {p.death ? ` · ${t.death[p.death.cause]} (${t.when(p.death.phase, p.death.number)})` : t.gameOver.survived}
                 </div>
               </div>
               <RoleIcon role={p.role} width={24} height={24} />
-              <span style={{ minWidth: 92, textAlign: 'right' }}>{ROLE_NAME[p.role]}</span>
+              <span style={{ minWidth: 92, textAlign: 'right' }}>{t.roles.name[p.role]}</span>
             </div>
           ))}
         </div>
@@ -58,6 +59,7 @@ export function CaseFile({ state, animate = true }: { state: GameState; animate?
 
 export function GameOverScreen() {
   const state = useGame();
+  const t = useT();
   const { startGame, closeGame, go } = useApp();
 
   useEffect(() => {
@@ -67,7 +69,8 @@ export function GameOverScreen() {
   }, [state.phase]);
 
   function playAgain() {
-    const players = state.players.map((p) => ({ id: p.id, name: p.name }));
+    // Same people, same numbers, same seating; only the deal is new.
+    const players = state.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat }));
     if (state.dealing === 'app') {
       startGame({
         type: 'CreateGame',
@@ -89,10 +92,10 @@ export function GameOverScreen() {
       <div className="actions">
         <div className="actions__row">
           <button type="button" className="btn btn--secondary" onClick={closeGame}>
-            На главную
+            {t.gameOver.home}
           </button>
           <button type="button" className="btn btn--primary" onClick={playAgain}>
-            Ещё раз
+            {t.gameOver.again}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import type { Player } from '@greenmafia/engine';
 import { type ReactNode, useEffect } from 'react';
+import { useT } from '../i18n';
 import { ChipGrid, type ChipLook } from './Chip';
 
 /** Bottom sheet with a dimmed backdrop. */
@@ -23,7 +24,7 @@ export function Sheet({ title, onClose, children }: { title?: ReactNode; onClose
 export function Confirm({
   title,
   text,
-  okLabel = 'Да',
+  okLabel,
   danger,
   onOk,
   onCancel,
@@ -35,15 +36,16 @@ export function Confirm({
   onOk: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   return (
     <Sheet title={title} onClose={onCancel}>
       {text && <p className="muted">{text}</p>}
       <div className="actions__row">
         <button type="button" className="btn btn--secondary" onClick={onCancel}>
-          Отмена
+          {t.common.cancel}
         </button>
         <button type="button" className={`btn ${danger ? 'btn--danger' : 'btn--primary btn--plain'}`} onClick={onOk}>
-          {okLabel}
+          {okLabel ?? t.common.yes}
         </button>
       </div>
     </Sheet>
@@ -67,6 +69,7 @@ export function PlayerPicker({
   onPick: (p: Player) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
     <Sheet title={title} onClose={onClose}>
       {hint && <p className="muted">{hint}</p>}
@@ -76,7 +79,7 @@ export function PlayerPicker({
         onPick={(p) => allowed(p) && onPick(p)}
       />
       <button type="button" className="btn btn--secondary" onClick={onClose}>
-        Отмена
+        {t.common.cancel}
       </button>
     </Sheet>
   );

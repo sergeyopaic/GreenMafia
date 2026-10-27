@@ -88,6 +88,7 @@ export function recommendedComposition(players: number): Composition {
 export interface CompositionIssue {
   code: string;
   message: string;
+  params?: Record<string, string | number>;
 }
 
 export interface CompositionCheck {
@@ -102,17 +103,18 @@ export function validateComposition(players: number, c: Composition): Compositio
   const warnings: CompositionIssue[] = [];
 
   if (!Number.isInteger(players) || players < MIN_PLAYERS || players > MAX_PLAYERS) {
-    errors.push({ code: 'players.range', message: `Игроков должно быть от ${MIN_PLAYERS} до ${MAX_PLAYERS}` });
+    errors.push({ code: 'players.range', message: `Игроков должно быть от ${MIN_PLAYERS} до ${MAX_PLAYERS}`, params: { min: MIN_PLAYERS, max: MAX_PLAYERS } });
   }
   for (const r of ROLES) {
     if (!Number.isInteger(c[r]) || c[r] < 0) {
-      errors.push({ code: 'role.negative', message: `Неверное количество: ${ROLE_NAME[r]}` });
+      errors.push({ code: 'role.negative', message: `Неверное количество: ${ROLE_NAME[r]}`, params: { role: r } });
     }
   }
   if (compositionTotal(c) !== players) {
     errors.push({
       code: 'composition.total',
       message: `Ролей ${compositionTotal(c)}, а игроков ${players}`,
+      params: { roles: compositionTotal(c), players },
     });
   }
   if (c.mafia + c.don < 1) {
@@ -120,7 +122,7 @@ export function validateComposition(players: number, c: Composition): Compositio
   }
   for (const r of SINGLE_ROLES) {
     if (c[r] > 1) {
-      errors.push({ code: 'composition.single', message: `${ROLE_NAME[r]} может быть только один` });
+      errors.push({ code: 'composition.single', message: `${ROLE_NAME[r]} может быть только один`, params: { role: r } });
     }
   }
   const town = c.civilian + c.commissar + c.doctor + c.lover;

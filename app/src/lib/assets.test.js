@@ -12,7 +12,10 @@ describe('готовый игровой комплект', () => {
       if (pendingArt.has(role)) expect(roleArt(role), `${role}: арт появился — уберите из pendingArt`).toBeNull();
       else expect(roleArt(role), role).toBeTruthy();
     }
-    for (const kind of ['killed', 'exiled', 'alibi', 'case-closed', 'checked-mafia', 'checked-clean', 'no-answer', 'checked-commissar', 'checked-not-commissar']) expect(stampImage(kind), kind).toBeTruthy();
+    for (const kind of ['killed', 'exiled', 'alibi', 'case-closed', 'checked-mafia', 'checked-clean', 'no-answer', 'checked-commissar', 'checked-not-commissar']) {
+      expect(stampImage(kind), kind).toBeTruthy();
+      expect(stampImage(kind, 'en'), `en/${kind}`).toBeTruthy();
+    }
     for (const name of ['paper', 'cardboard']) expect(asset(`textures/${name}`)).toBeTruthy();
     expect(asset('textures/felt')).toBeNull();
   });
@@ -30,9 +33,11 @@ describe('готовый игровой комплект', () => {
     }
   });
   it('печатный комплект содержит ровно 20 номеров с двумя сторонами', () => {
-    const html = readFileSync(new URL('../../public/print-kit.html', import.meta.url), 'utf8');
-    expect(html.match(/class="tent"/g)?.length).toBe(20);
-    for (let n = 1; n <= 20; n++) expect(html.split(`<b>${n}</b>`).length - 1).toBe(2);
-    expect(html).toContain('@page{size:A4');
+    for (const file of ['print-kit.html', 'print-kit.en.html']) {
+      const html = readFileSync(new URL(`../../public/${file}`, import.meta.url), 'utf8');
+      expect(html.match(/class="tent"/g)?.length, file).toBe(20);
+      for (let n = 1; n <= 20; n++) expect(html.split(`<b>${n}</b>`).length - 1).toBe(2);
+      expect(html).toContain('@page{size:A4');
+    }
   });
 });

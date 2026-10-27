@@ -1,6 +1,6 @@
 // Day phase: last words, speeches, nominations, voting, ties, verdict (GAME_DESIGN.md §8).
 
-import { fail } from './errors';
+import { type Reason, fail, failWith } from './errors';
 import {
   alivePlayers,
   currentDay,
@@ -120,25 +120,31 @@ function dayNumber(state: GameState): number {
 }
 
 /** Why `candidate` cannot be nominated by the current speaker, or null (§8.3). */
-export function nominationError(state: GameState, candidate: string): string | null {
+export function nominationError(state: GameState, candidate: string): Reason | null {
   const speaker = currentSpeaker(state);
-  if (!speaker) return 'Сейчас нельзя выставлять';
+  if (!speaker) return { code: 'nominate.notNow', message: 'Сейчас нельзя выставлять' };
   const day = currentDay(state);
   if (day.nominations.some((n) => n.by === speaker.id)) {
-    return `${label(speaker)} уже выставил кандидата`;
+    return { code: 'nominate.already', message: `${label(speaker)} уже выставил кандидата`, params: { seat: speaker.seat } };
   }
   const c = findPlayer(state, candidate);
-  if (!c) return 'Такого игрока нет';
-  if (!c.alive) return `${label(c)} выбыл из игры`;
-  if (c.id === speaker.id && !state.settings.selfNomination) return 'Нельзя выставить себя';
-  if (hasAlibi(state, c.id)) return `У ${label(c)} алиби`;
-  if (day.nominations.some((n) => n.candidate === c.id)) return `${label(c)} уже выставлен`;
+  if (!c) return { code: 'nominate.unknown', message: 'Такого игрока нет' };
+  if (!c.alive) return { code: 'nominate.out', message: `${label(c)} выбыл из игры`, params: { seat: c.seat } };
+  if (c.id === speaker.id && !state.settings.selfNomination) return { code: 'nominate.self', message: 'Нельзя выставить себя' };
+  if (hasAlibi(state, c.id)) return { code: 'nominate.alibi', message: `У ${label(c)} алиби`, params: { seat: c.seat } };
+  if (day.nominations.some((n) => n.candidate === c.id)) {
+    return { code: 'nominate.taken', message: `${label(c)} уже выставлен`, params: { seat: c.seat } };
+  }
   return null;
+}
+
+function seatParam(state: GameState, id: string): { seat: number | string } {
+  return { seat: findPlayer(state, id)?.seat ?? '?' };
 }
 
 export function nominate(state: GameState, candidate: string): void {
   const err = nominationError(state, candidate);
-  if (err) fail('day.nominate', err);
+  if (err) failWith('day.nominate', err);
   const speaker = currentSpeaker(state) as Player;
   currentDay(state).nominations.push({ by: speaker.id, candidate });
 }
@@ -196,10 +202,10 @@ export function castVotes(
     voters = Object.fromEntries(keys.map((k) => [k, [] as string[]]));
     const seen = new Set<string>();
     for (const [key, ids] of Object.entries(input.voters)) {
-      if (!keys.includes(key)) fail('vote.candidate', `${labelOf(state, key)} не кандидат`);
+      if (!keys.includes(key)) fail('vote.candidate', `${labelOf(state, key)} не кандидат`, seatParam(state, key));
       for (const id of ids) {
-        if (!eligibleIds.has(id)) fail('vote.voter', `${labelOf(state, id)} не может голосовать`);
-        if (seen.has(id)) fail('vote.twice', `${labelOf(state, id)} уже проголосовал`);
+        if (!eligibleIds.has(id)) fail('vote.voter', `${labelOf(state, id)} не может голосовать`, seatParam(state, id));
+        if (seen.has(id)) fail('vote.twice', `${labelOf(state, id)} уже проголосовал`, seatParam(state, id));
         seen.add(id);
         (voters[key] as string[]).push(id);
       }
@@ -208,13 +214,13 @@ export function castVotes(
   } else {
     let sum = 0;
     for (const [key, n] of Object.entries(input.counts ?? {})) {
-      if (!keys.includes(key)) fail('vote.candidate', `${labelOf(state, key)} не кандидат`);
+      if (!keys.includes(key)) fail('vote.candidate', `${labelOf(state, key)} не кандидат`, seatParam(state, key));
       if (!Number.isInteger(n) || n < 0) fail('vote.count', 'Число голосов должно быть целым и неотрицательным');
       counts[key] = n;
       sum += n;
     }
     if (sum > eligible.length) {
-      fail('vote.tooMany', `Голосов ${sum}, а голосующих только ${eligible.length}`);
+      fail('vote.tooMany', `Голосов ${sum}, а голосующих только ${eligible.length}`, { sum, eligible: eligible.length });
     }
   }
 

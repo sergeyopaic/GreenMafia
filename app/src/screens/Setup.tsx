@@ -11,7 +11,6 @@ import {
   type Role,
   SINGLE_ROLES,
   type Settings,
-  TEAM_NAME,
   emptyComposition,
   recommendedComposition,
   validateComposition,
@@ -22,18 +21,17 @@ import { SeatPicker } from '../components/SeatPicker';
 import { IconBack, RoleIcon } from '../components/icons';
 import { type PlayerProfile, loadPlayers, normalizeName, resolveSeats, savePlayers } from '../lib/players';
 import { type LastSetup, loadLastSetup, saveLastSetup } from '../lib/storage';
-import { ROLE_NAME, SETTINGS_GROUPS, type SettingMeta, getSetting, plural, setSetting } from '../lib/text';
+import { type SettingMeta, getSetting, setSetting, settingsGroups } from '../lib/text';
+import { issueText, useT } from '../i18n';
 import { randomSeed, useApp } from '../store';
 
 type Step = 0 | 1 | 2 | 3 | 4;
-const STEP_TITLES = ['Игроки', 'Состав', 'Правила', 'Раздача', 'Карты'];
 
 function resize(names: string[], n: number): string[] {
   return Array.from({ length: n }, (_, i) => names[i] ?? '');
 }
 
-/** Keeps the first `n` seat numbers; new places get the smallest free numbers. */
-/** A seat number per row; `null` = no number yet (after «Сбросить все номера»). */
+/** A seat number per row; `null` = no number yet (after "reset all numbers"). */
 type SeatNum = number | null;
 
 /** Keeps the first `n` seat numbers; new places get the smallest free numbers. */
@@ -81,6 +79,8 @@ function samePreset(s: Settings): PresetName | 'custom' {
 
 export function SetupScreen() {
   const { go, startGame } = useApp();
+  const t = useT();
+  const st = t.setup;
   const [loaded, setLoaded] = useState(false);
   const [step, setStep] = useState<Step>(0);
   const [count, setCount] = useState(10);
@@ -124,7 +124,7 @@ export function SetupScreen() {
     setComp(recommendedComposition(c));
   }
 
-  const players = names.map((name, i) => ({ id: `p${i + 1}`, name: name.trim() || `Игрок ${seatNums[i] ?? i + 1}` }));
+  const players = names.map((name, i) => ({ id: `p${i + 1}`, name: name.trim() || t.defaultName(seatNums[i] ?? i + 1) }));
 
   /** Moves a person (name and number together) one place in the seating order. */
   function moveRow(i: number, d: -1 | 1) {
@@ -163,15 +163,15 @@ export function SetupScreen() {
       setSeatNums(resizeSeats(seatNums, n));
       setComp(recommendedComposition(n));
     } else {
-      useApp.getState().showToast(`За столом уже ${MAX_PLAYERS} игроков`);
+      useApp.getState().showToast(st.tableFull(MAX_PLAYERS));
     }
   }
 
-  const seats = useMemo(() => resolveSeats(names, profiles), [names, profiles]);
+  const seats = useMemo(() => resolveSeats(names, profiles, Date.now(), t.players.errors), [names, profiles, t]);
 
   function begin() {
     if (!allSeated) {
-      useApp.getState().showToast('Не у всех игроков есть номер');
+      useApp.getState().showToast(st.missingSeats);
       setStep(0);
       return;
     }
@@ -188,7 +188,7 @@ export function SetupScreen() {
     const event = {
       type: 'CreateGame' as const,
       settings,
-      players: seats.players.map((pl, i) => ({ ...pl, seat: seatNums[i] as number })),
+      players: seats.players.map((pl, i) => ({ ...pl, seat: seatNums[i] as number, name: pl.name || t.defaultName(seatNums[i] as number) })),
       composition: comp,
       dealing,
       ...(dealing === 'app' ? { seed: randomSeed() } : { roles: cardRoles as Role[] }),
@@ -231,14 +231,12 @@ export function SetupScreen() {
   return (
     <main className="screen">
       <header className="topbar">
-        <button type="button" className="icon-btn" onClick={back} aria-label="Назад">
+        <button type="button" className="icon-btn" onClick={back} aria-label={t.common.back}>
           <IconBack />
         </button>
         <div className="topbar__title">
-          <b>{STEP_TITLES[step]}</b>
-          <span>
-            новое дело · шаг {step + 1} из {total}
-          </span>
+          <b>{st.steps[step]}</b>
+          <span>{st.sub(step + 1, total)}</span>
         </div>
       </header>
       <div className="wizard-steps" aria-hidden="true">
@@ -272,10 +270,10 @@ export function SetupScreen() {
       <div className="actions">
         <div className="actions__row">
           <button type="button" className="btn btn--secondary" onClick={back}>
-            Назад
+            {t.common.back}
           </button>
           <button type="button" className="btn btn--primary" disabled={!canNext} onClick={next}>
-            {step === 4 || (step === 3 && dealing === 'app') ? 'Начать игру' : 'Дальше'}
+            {step === 4 || (step === 3 && dealing === 'app') ? st.start : t.common.next}
           </button>
         </div>
       </div>
@@ -314,27 +312,29 @@ function PlayersStep({
   error: string | null;
   newNames: string[];
 }) {
+  const t = useT();
+  const st = t.setup;
   const seatedKeys = new Set(names.map(normalizeName).filter(Boolean));
   const [picking, setPicking] = useState<number | null>(null);
   const inOrder = seatNums.every((n, i) => n === i + 1);
-  const label = (i: number) => names[i]?.trim() || (seatNums[i] ? `Игрок ${seatNums[i]}` : `Место ${i + 1} по посадке`);
+  const label = (i: number) => names[i]?.trim() || (seatNums[i] ? t.defaultName(seatNums[i] as number) : st.place(i + 1));
   const missing = seatNums.map((n, i) => (n === null ? i : -1)).filter((i) => i >= 0);
   const anySeat = seatNums.some((n) => n !== null);
 
   return (
     <>
       <section className="folder">
-        <span className="folder__tab">состав стола</span>
+        <span className="folder__tab">{st.table}</span>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <h2>{count}</h2>
-            <div className="muted">{plural(count, 'игрок', 'игрока', 'игроков')} за столом</div>
+            <div className="muted">{st.atTable(count)}</div>
           </div>
           <div className="stepper">
-            <button type="button" onClick={() => onCount(count - 1)} disabled={count <= MIN_PLAYERS} aria-label="Меньше">
+            <button type="button" onClick={() => onCount(count - 1)} disabled={count <= MIN_PLAYERS} aria-label={t.common.less}>
               −
             </button>
-            <button type="button" onClick={() => onCount(count + 1)} disabled={count >= MAX_PLAYERS} aria-label="Больше">
+            <button type="button" onClick={() => onCount(count + 1)} disabled={count >= MAX_PLAYERS} aria-label={t.common.more}>
               +
             </button>
           </div>
@@ -343,12 +343,12 @@ function PlayersStep({
 
       {profiles.length > 0 && (
         <section className="field">
-          <div className="field__label">Из базы игроков — нажмите, чтобы посадить за стол</div>
+          <div className="field__label">{st.fromBase}</div>
           <div className="roster">
             {profiles.map((p) => (
               <button type="button" key={p.id} aria-pressed={seatedKeys.has(normalizeName(p.name))} onClick={() => onToggle(p)}>
                 <span className="avatar" aria-hidden="true">
-                  <span>{(p.name[0] ?? '?').toLocaleUpperCase('ru-RU')}</span>
+                  <span>{(p.name[0] ?? '?').toLocaleUpperCase()}</span>
                 </span>
                 {p.name}
               </button>
@@ -358,14 +358,14 @@ function PlayersStep({
       )}
 
       <section className="field">
-        <div className="field__label">Порядок посадки по часовой стрелке · фишка — номер с карточки</div>
+        <div className="field__label">{st.seatingLabel}</div>
         {names.map((name, i) => (
           <div className="name-row" key={i}>
             <button
               type="button"
               className="seat-pick"
               onClick={() => setPicking(i)}
-              aria-label={seatNums[i] ? `Номер ${seatNums[i]} — сменить номер игрока ${label(i)}` : `Выбрать номер игрока ${label(i)}`}
+              aria-label={seatNums[i] ? st.seatAria(seatNums[i] as number, label(i)) : st.pickSeatAria(label(i))}
             >
               {seatNums[i] ? (
                 <MiniChip player={{ seat: seatNums[i] as number }} />
@@ -378,20 +378,20 @@ function PlayersStep({
             <input
               className="input"
               value={name}
-              placeholder={seatNums[i] ? `Игрок ${seatNums[i]}` : 'Имя'}
+              placeholder={seatNums[i] ? t.defaultName(seatNums[i] as number) : t.common.name}
               maxLength={20}
               onChange={(e) => {
                 const copy = [...names];
                 copy[i] = e.target.value;
                 onNames(copy);
               }}
-              aria-label={`Имя игрока ${seatNums[i] ? `с номером ${seatNums[i]}` : `на месте ${i + 1}`}`}
+              aria-label={st.nameAria(seatNums[i] ?? null, i + 1)}
             />
             <div className="name-row__move">
-              <button type="button" onClick={() => onMove(i, -1)} disabled={i === 0} aria-label="Выше">
+              <button type="button" onClick={() => onMove(i, -1)} disabled={i === 0} aria-label={t.common.up}>
                 ↑
               </button>
-              <button type="button" onClick={() => onMove(i, 1)} disabled={i === names.length - 1} aria-label="Ниже">
+              <button type="button" onClick={() => onMove(i, 1)} disabled={i === names.length - 1} aria-label={t.common.down}>
                 ↓
               </button>
             </div>
@@ -400,25 +400,25 @@ function PlayersStep({
         {error && <div className="notice notice--warn">{error}</div>}
         {missing.length > 0 && (
           <div className="notice notice--warn">
-            Без номера: {missing.map(label).join(', ')}. Нажмите на фишку «?», чтобы выдать номер — дальше без номеров не пройти.
+            {st.noSeat(missing.map(label).join(', '))}
           </div>
         )}
         {!error && newNames.length > 0 && (
-          <div className="notice">Новые в базе после старта: {newNames.join(', ')}.</div>
+          <div className="notice">{st.newInBase(newNames.join(', '))}</div>
         )}
-        <p className="list__sub">Речи идут по порядку посадки. Номер — только метка игрока: нажмите на фишку, чтобы выбрать его (1–20).</p>
+        <p className="list__sub">{st.seatingHint}</p>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button type="button" className="btn btn--ghost" onClick={() => onNames(names.map(() => ''))}>
-            очистить имена
+            {st.clearNames}
           </button>
           {anySeat && (
             <button type="button" className="btn btn--ghost" onClick={onClearSeats}>
-              сбросить все номера
+              {st.clearSeats}
             </button>
           )}
           {!inOrder && (
             <button type="button" className="btn btn--ghost" onClick={onResetSeats}>
-              номера по порядку 1–{count}
+              {st.seatsInOrder(count)}
             </button>
           )}
         </div>
@@ -426,7 +426,7 @@ function PlayersStep({
 
       {picking !== null && (
         <SeatPicker
-          title={`Номер: ${label(picking)}`}
+          title={st.seatTitle(label(picking))}
           current={seatNums[picking] ?? 0}
           takenBy={(n) => {
             const row = seatNums.findIndex((x, j) => x === n && j !== picking);
@@ -459,6 +459,8 @@ function CompositionStep({
   onComp: (c: Composition) => void;
   check: ReturnType<typeof validateComposition>;
 }) {
+  const t = useT();
+  const st = t.setup;
   const editable: Role[] = ['mafia', 'don', 'commissar', 'doctor', 'lover', 'maniac'];
   const pin = check.balance === 'town' ? 18 : check.balance === 'mafia' ? 82 : 50;
   const isRecommended = JSON.stringify(comp) === JSON.stringify(recommendedComposition(count));
@@ -466,7 +468,7 @@ function CompositionStep({
   return (
     <>
       <section className="folder">
-        <span className="folder__tab">кто за столом</span>
+        <span className="folder__tab">{st.who}</span>
         {[...editable, 'civilian' as Role].map((role) => {
           const max = (SINGLE_ROLES as readonly Role[]).includes(role) ? 1 : 6;
           // At least one member of the mafia team: a mafioso or the Don.
@@ -475,8 +477,8 @@ function CompositionStep({
             <div className="role-line" key={role}>
               <RoleIcon role={role} className="role-line__icon" />
               <div className="role-line__name">
-                {ROLE_NAME[role]}
-                <div className="list__sub">{TEAM_NAME[ROLE_TEAM[role]]}</div>
+                {t.roles.name[role]}
+                <div className="list__sub">{t.roles.team[ROLE_TEAM[role]]}</div>
               </div>
               {role === 'civilian' ? (
                 <div className="stepper">
@@ -484,7 +486,7 @@ function CompositionStep({
                 </div>
               ) : (
                 <div className="stepper">
-                  <button type="button" disabled={comp[role] <= min} onClick={() => onComp({ ...comp, [role]: comp[role] - 1 })} aria-label="Меньше">
+                  <button type="button" disabled={comp[role] <= min} onClick={() => onComp({ ...comp, [role]: comp[role] - 1 })} aria-label={t.common.less}>
                     −
                   </button>
                   <output>{comp[role]}</output>
@@ -492,7 +494,7 @@ function CompositionStep({
                     type="button"
                     disabled={comp[role] >= max || comp.civilian <= 0}
                     onClick={() => onComp({ ...comp, [role]: comp[role] + 1 })}
-                    aria-label="Больше"
+                    aria-label={t.common.more}
                   >
                     +
                   </button>
@@ -503,35 +505,35 @@ function CompositionStep({
         })}
       </section>
 
-      <div className="balance" aria-label="Баланс">
-        <span>город</span>
+      <div className="balance" aria-label={st.balanceAria}>
+        <span>{st.balanceTown}</span>
         <div className="balance__scale">
           <div className="balance__pin" style={{ left: `${pin}%` }} />
         </div>
-        <span>мафия</span>
+        <span>{st.balanceMafia}</span>
       </div>
       <p className="center type muted" style={{ fontSize: 14 }}>
-        {check.balance === 'balanced' ? 'Баланс в норме' : check.balance === 'town' ? 'Перевес города' : 'Перевес мафии'}
-        {isRecommended ? ' · состав по таблице' : ''}
+        {st.balance[check.balance]}
+        {isRecommended ? st.byTable : ''}
       </p>
 
       {check.errors.map((e) => (
         <div className="notice notice--warn" key={e.code}>
-          {e.message}
+          {issueText(t, e)}
         </div>
       ))}
       {check.warnings.map((w) => (
         <div className="notice" key={w.code}>
-          {w.message}
+          {issueText(t, w)}
         </div>
       ))}
       {!isRecommended && (
         <button type="button" className="btn btn--ghost" style={{ alignSelf: 'center' }} onClick={() => onComp(recommendedComposition(count))}>
-          вернуть рекомендованный состав
+          {st.resetComposition}
         </button>
       )}
       <p className="hand" style={{ fontSize: 18 }}>
-        Мирных считаю сам: все, кому не досталась особая роль.
+        {st.civiliansNote}
       </p>
     </>
   );
@@ -540,24 +542,26 @@ function CompositionStep({
 // ---------- Step 3: rules ----------
 
 function RulesStep({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
+  const t = useT();
+  const st = t.setup;
   const preset = samePreset(settings);
   return (
     <>
       <div className="field">
-        <div className="field__label">Набор правил</div>
+        <div className="field__label">{st.ruleSet}</div>
         <div className="seg" role="group">
           <button type="button" aria-pressed={preset === 'classic'} onClick={() => onChange(PRESETS.classic)}>
-            Классика
+            {st.presets.classic}
           </button>
           <button type="button" aria-pressed={preset === 'sports'} onClick={() => onChange(PRESETS.sports)}>
-            Спортивная
+            {st.presets.sports}
           </button>
           <button type="button" aria-pressed={preset === 'custom'} disabled>
-            Своя
+            {st.presets.custom}
           </button>
         </div>
       </div>
-      {SETTINGS_GROUPS.map((g) => (
+      {settingsGroups(t).map((g) => (
         <section className="folder" key={g.title}>
           <span className="folder__tab">{g.title}</span>
           <div className="list">
@@ -572,6 +576,7 @@ function RulesStep({ settings, onChange }: { settings: Settings; onChange: (s: S
 }
 
 function SettingRow({ meta, settings, onChange }: { meta: SettingMeta; settings: Settings; onChange: (s: Settings) => void }) {
+  const t = useT();
   const value = getSetting(settings, meta.path);
   const set = (v: unknown) => onChange(setSetting(settings, meta.path, v));
 
@@ -595,14 +600,14 @@ function SettingRow({ meta, settings, onChange }: { meta: SettingMeta; settings:
           {meta.hint && <div className="list__sub">{meta.hint}</div>}
         </div>
         <div className="stepper">
-          <button type="button" disabled={n <= (meta.min ?? 0)} onClick={() => set(Math.max(meta.min ?? 0, n - (meta.step ?? 1)))} aria-label="Меньше">
+          <button type="button" disabled={n <= (meta.min ?? 0)} onClick={() => set(Math.max(meta.min ?? 0, n - (meta.step ?? 1)))} aria-label={t.common.less}>
             −
           </button>
           <output style={{ fontSize: 22, minWidth: 52 }}>
             {n}
             <small style={{ fontSize: 13 }}>{meta.unit}</small>
           </output>
-          <button type="button" disabled={n >= (meta.max ?? 999)} onClick={() => set(Math.min(meta.max ?? 999, n + (meta.step ?? 1)))} aria-label="Больше">
+          <button type="button" disabled={n >= (meta.max ?? 999)} onClick={() => set(Math.min(meta.max ?? 999, n + (meta.step ?? 1)))} aria-label={t.common.more}>
             +
           </button>
         </div>
@@ -639,29 +644,31 @@ function DealStep({
   count: number;
   comp: Composition;
 }) {
+  const t = useT();
+  const st = t.setup;
   const summary = ROLES.filter((r) => comp[r] > 0)
-    .map((r) => (comp[r] > 1 || r === 'civilian' || r === 'mafia' ? `${ROLE_NAME[r].toLowerCase()} × ${comp[r]}` : ROLE_NAME[r].toLowerCase()))
+    .map((r) => (comp[r] > 1 || r === 'civilian' || r === 'mafia' ? `${t.roles.inline[r]} × ${comp[r]}` : t.roles.inline[r]))
     .join(', ');
   return (
     <>
       <button type="button" className="choice-card" aria-pressed={dealing === 'app'} onClick={() => onDealing('app')}>
         <RoleIcon role="mafia" width={36} height={36} />
         <div>
-          <b>Приложение раздаст</b>
-          <span>Телефон идёт по кругу. Каждый открывает свой конверт, видит роль и передаёт дальше.</span>
+          <b>{st.dealApp}</b>
+          <span>{st.dealAppText}</span>
         </div>
       </button>
       <button type="button" className="choice-card" aria-pressed={dealing === 'cards'} onClick={() => onDealing('cards')}>
         <RoleIcon role="civilian" width={36} height={36} />
         <div>
-          <b>Раздам картами сам</b>
-          <span>Раздайте физические карты, а потом отметьте, у кого какая роль.</span>
+          <b>{st.dealCards}</b>
+          <span>{st.dealCardsText}</span>
         </div>
       </button>
       <section className="folder">
-        <span className="folder__tab">итого</span>
+        <span className="folder__tab">{st.total}</span>
         <p>
-          <b>{count}</b> {plural(count, 'игрок', 'игрока', 'игроков')}: {summary}.
+          <b>{count}</b> {t.count.playersWord(count)}: {summary}.
         </p>
       </section>
     </>
@@ -688,12 +695,14 @@ function CardsStep({
   comp: Composition;
   onRoles: (r: (Role | '')[]) => void;
 }) {
+  const t = useT();
+  const st = t.setup;
   const left = (r: Role) => comp[r] - roles.filter((x) => x === r).length;
   const special: Role[] = ROLES.filter((r) => r !== 'civilian' && comp[r] > 0);
   return (
     <>
-      <p className="muted">Отметьте особые роли — всем остальным достанется «Мирный житель».</p>
-      <div className="notice notice--host">Не показывайте этот экран игрокам.</div>
+      <p className="muted">{st.cardsNote}</p>
+      <div className="notice notice--host">{st.hostOnly}</div>
       <div className="list">
         {names.map((name, i) => (
           <div className="list__row" key={i} style={{ flexWrap: 'wrap' }}>
@@ -708,12 +717,12 @@ function CardsStep({
                 copy[i] = e.target.value as Role | '';
                 onRoles(copy);
               }}
-              aria-label={`Роль игрока ${seats[i] ?? i + 1}`}
+              aria-label={st.roleAria(seats[i] ?? i + 1)}
             >
               <option value="">—</option>
               {ROLES.map((r) => (
                 <option key={r} value={r} disabled={comp[r] === 0 || (left(r) <= 0 && roles[i] !== r)}>
-                  {ROLE_NAME[r]}
+                  {t.roles.name[r]}
                 </option>
               ))}
             </select>
@@ -726,13 +735,13 @@ function CardsStep({
         disabled={special.some((r) => left(r) > 0)}
         onClick={() => onRoles(roles.map((r) => (r === '' ? 'civilian' : r)))}
       >
-        Остальные — мирные
+        {st.restCivilians}
       </button>
       <p className="list__sub">
-        Осталось раздать:{' '}
+        {st.left}{' '}
         {ROLES.filter((r) => left(r) !== 0)
-          .map((r) => `${ROLE_NAME[r].toLowerCase()} ${left(r)}`)
-          .join(', ') || 'всё сходится'}
+          .map((r) => `${t.roles.inline[r]} ${left(r)}`)
+          .join(', ') || st.allSet}
       </p>
     </>
   );

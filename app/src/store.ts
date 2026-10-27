@@ -9,6 +9,7 @@ import {
   undo as engineUndo,
 } from '@greenmafia/engine';
 import { create } from 'zustand';
+import { type Lang, detectLang, dictFor, errorText } from './i18n/dicts';
 import { setSoundContext, setSoundEnabled } from './lib/sound';
 import {
   type SavedGame,
@@ -49,6 +50,7 @@ interface AppState {
   /** The phone has been handed back to the host after the deal. */
   handBackAck: boolean;
   sound: boolean;
+  lang: Lang;
 
   init(): Promise<void>;
   go(screen: Screen): void;
@@ -63,6 +65,7 @@ interface AppState {
   setPaused(p: boolean): void;
   ackHandBack(): void;
   toggleSound(): void;
+  setLang(lang: Lang): void;
 }
 
 let toastSeq = 0;
@@ -102,6 +105,7 @@ export const useApp = create<AppState>((set, get) => ({
   paused: false,
   handBackAck: false,
   sound: true,
+  lang: detectLang(),
 
   async init() {
     const [current, prefs] = await Promise.all([loadCurrent(), loadPrefs()]);
@@ -112,7 +116,8 @@ export const useApp = create<AppState>((set, get) => ({
       const r = replayTolerant(current.events);
       if (r.game && r.game.state.phase.t !== 'gameOver') resumable = current;
     }
-    set({ ready: true, resumable, sound: prefs.sound });
+    const lang = prefs.lang ?? detectLang();
+    set({ ready: true, resumable, sound: prefs.sound, lang });
   },
 
   go(screen) {
@@ -123,7 +128,7 @@ export const useApp = create<AppState>((set, get) => ({
   startGame(event) {
     const r = newGame(event);
     if (!r.ok) {
-      get().showToast(r.error.message);
+      get().showToast(errorText(dictFor(get().lang), r.error));
       return false;
     }
     const id = newId();
@@ -146,16 +151,15 @@ export const useApp = create<AppState>((set, get) => ({
     if (!saved) return;
     const r = replayTolerant(saved.events);
     if (!r.game) {
-      get().showToast(`Не удалось восстановить игру: ${r.error?.message ?? 'журнал повреждён'}`);
+      const t = dictFor(get().lang);
+      get().showToast(t.store.restoreFailed(r.error ? errorText(t, r.error) : t.store.logBroken));
       void clearCurrent();
       set({ resumable: null });
       return;
     }
     const game = r.game;
     if (r.dropped > 0) {
-      get().showToast(
-        `Последние действия (${r.dropped}) не прошли проверку правил и отброшены. Игра продолжена с последнего корректного шага.`,
-      );
+      get().showToast(dictFor(get().lang).store.dropped(r.dropped));
       persist(saved.id, saved.createdAt, game);
     }
     set({
@@ -181,7 +185,7 @@ export const useApp = create<AppState>((set, get) => ({
     }
     const r = engineDispatch(game, event);
     if (!r.ok) {
-      get().showToast(r.error.message);
+      get().showToast(errorText(dictFor(get().lang), r.error));
       return false;
     }
     set({ game: r.value });
@@ -234,8 +238,13 @@ export const useApp = create<AppState>((set, get) => ({
   toggleSound() {
     const sound = !get().sound;
     setSoundEnabled(sound);
-    void savePrefs({ sound });
+    void savePrefs({ sound, lang: get().lang });
     set({ sound });
+  },
+
+  setLang(lang) {
+    void savePrefs({ sound: get().sound, lang });
+    set({ lang });
   },
 }));
 
@@ -246,7 +255,7 @@ useApp.subscribe((state) => {
 /** The current game state; only call inside the game screens. */
 export function useGame() {
   const game = useApp((s) => s.game);
-  if (!game) throw new Error('Нет активной игры');
+  if (!game) throw new Error('No active game');
   return game.state;
 }
 

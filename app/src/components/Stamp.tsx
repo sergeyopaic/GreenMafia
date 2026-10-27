@@ -1,18 +1,8 @@
 import { type CSSProperties, useEffect } from 'react';
 import { type StampKind, stampImage } from '../lib/assets';
+import { useT } from '../i18n';
 import { play } from '../lib/sound';
 
-const TEXT: Record<StampKind, string> = {
-  killed: 'Убит',
-  exiled: 'Изгнан',
-  alibi: 'Алиби',
-  'case-closed': 'Дело закрыто',
-  'checked-mafia': 'Мафия',
-  'checked-clean': 'Не мафия',
-  'no-answer': 'Нет ответа',
-  'checked-commissar': 'Комиссар',
-  'checked-not-commissar': 'Не комиссар',
-};
 
 /** Rubber stamp: image from assets/stamps/<kind>.* or a typeset stamp. */
 export function Stamp({
@@ -34,15 +24,16 @@ export function Stamp({
     if (animate && !silent) play('stamp', 0.6);
   }, [animate, silent]);
 
-  const url = stampImage(kind);
+  const t = useT();
+  const url = stampImage(kind, t.code);
   const style = { '--stamp-rot': `${rotate}deg` } as CSSProperties;
   if (url) {
-    return <img className={`stamp-img${animate ? ' slam' : ''}`} style={style} src={url} alt={TEXT[kind]} />;
+    return <img className={`stamp-img${animate ? ' slam' : ''}`} style={style} src={url} alt={t.stamps[kind]} />;
   }
   const ok = kind === 'checked-clean' || kind === 'alibi' || kind === 'no-answer' || kind === 'checked-not-commissar';
   return (
     <span className={`stamp${big ? ' stamp--big' : ''}${ok ? ' stamp--ok' : ''}${animate ? ' slam' : ''}`} style={style}>
-      {text ?? TEXT[kind]}
+      {text ?? t.stamps[kind]}
     </span>
   );
 }

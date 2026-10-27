@@ -1,6 +1,6 @@
 // Night phase: wake order, target validation and simultaneous resolution (GAME_DESIGN.md §7).
 
-import { fail } from './errors';
+import { type Reason, fail, failWith } from './errors';
 import {
   aliveWithRole,
   currentNight,
@@ -93,43 +93,47 @@ export function isStepBlocked(state: GameState, step: NightStep): boolean {
 }
 
 /** Why `targetId` cannot be chosen on `step`, or null if it can (§7.3). */
-export function targetError(state: GameState, step: ActionStep, targetId: string): string | null {
+export function targetError(state: GameState, step: ActionStep, targetId: string): Reason | null {
   const t = findPlayer(state, targetId);
-  if (!t) return 'Такого игрока нет';
-  if (!t.alive) return `${label(t)} выбыл из игры`;
+  if (!t) return { code: 'target.unknown', message: 'Такого игрока нет' };
+  if (!t.alive) return { code: 'target.out', message: `${label(t)} выбыл из игры`, params: { seat: t.seat } };
   const s = state.settings;
   const m = state.memory;
+  const r = (code: string, message: string): Reason => ({ code, message });
+  const withSeat = (code: string, message: string): Reason => ({ code, message, params: { seat: t.seat } });
 
   switch (step) {
     case 'lover':
-      if (holder(state, 'lover')?.id === t.id) return 'Любовница не может выбрать себя';
+      if (holder(state, 'lover')?.id === t.id) return r('target.lover.self', 'Любовница не может выбрать себя');
       if (!s.loverRepeatTarget && m.lastLoverTarget === t.id) {
-        return `Любовница была у ${label(t)} прошлой ночью`;
+        return withSeat('target.lover.repeat', `Любовница была у ${label(t)} прошлой ночью`);
       }
       return null;
     case 'mafia':
-      if (!s.mafiaCanTargetMafia && isMafiaTeam(t.role)) return 'Мафия не может выбрать своего';
+      if (!s.mafiaCanTargetMafia && isMafiaTeam(t.role)) return r('target.mafia.own', 'Мафия не может выбрать своего');
       return null;
     case 'don':
-      if (holder(state, 'don')?.id === t.id) return 'Дон не может проверить себя';
+      if (holder(state, 'don')?.id === t.id) return r('target.don.self', 'Дон не может проверить себя');
       return null;
     case 'maniac':
-      if (holder(state, 'maniac')?.id === t.id) return 'Маньяк не может выбрать себя';
+      if (holder(state, 'maniac')?.id === t.id) return r('target.maniac.self', 'Маньяк не может выбрать себя');
       return null;
     case 'doctor': {
       if (holder(state, 'doctor')?.id === t.id) {
         const limit = s.doctorSelfHealLimit;
         if (limit !== null && m.doctorSelfHeals >= limit) {
-          return limit === 0 ? 'Доктор не может лечить себя' : 'Доктор уже лечил себя';
+          return limit === 0
+            ? r('target.doctor.noSelf', 'Доктор не может лечить себя')
+            : r('target.doctor.selfUsed', 'Доктор уже лечил себя');
         }
       }
       if (!s.doctorRepeatTarget && m.lastDoctorTarget === t.id) {
-        return `Доктор лечил ${label(t)} прошлой ночью`;
+        return withSeat('target.doctor.repeat', `Доктор лечил ${label(t)} прошлой ночью`);
       }
       return null;
     }
     case 'commissar':
-      if (holder(state, 'commissar')?.id === t.id) return 'Комиссар не может проверить себя';
+      if (holder(state, 'commissar')?.id === t.id) return r('target.commissar.self', 'Комиссар не может проверить себя');
       return null;
   }
 }
@@ -141,7 +145,7 @@ export function nightChoose(state: GameState, target: Choice): void {
   if (isStepBlocked(state, step)) fail('night.blocked', 'К этой роли пришла любовница — ход пропускается');
   if (target !== null) {
     const err = targetError(state, step, target);
-    if (err) fail('night.target', err);
+    if (err) failWith('night.target', err);
   }
   currentNight(state).choices[step] = target;
 }

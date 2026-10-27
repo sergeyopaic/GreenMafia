@@ -1,27 +1,23 @@
-import { type Player, getCommissarResult, getDonResult, getNightStepView } from '@greenmafia/engine';
+import { type Player, type Reason, getCommissarResult, getDonResult, getNightStepView } from '@greenmafia/engine';
 import { useEffect, useState } from 'react';
 import { Chip, ChipGrid } from '../../components/Chip';
 import { RoleIcon } from '../../components/icons';
 import { Stamp } from '../../components/Stamp';
 import { TypeLine } from '../../components/TypeLine';
 import { play } from '../../lib/sound';
-import { SCRIPT, STEP_NAME, seat } from '../../lib/text';
+import { type Dict, reasonText, useT } from '../../i18n';
 import { useElapsed } from '../../lib/useElapsed';
 import { useApp, useGame } from '../../store';
 
-/** Short tag under a chip that cannot be chosen. */
-function shortReason(reason: string | null, p: Player): string {
+/** Short tag under a chip that cannot be chosen ("last night", "self", "own"). */
+function shortReason(t: Dict, reason: Reason | null, p: Player): string {
   if (!reason || !p.alive) return '';
-  if (reason.includes('прошлой ночью')) return 'вчера';
-  if (reason.includes('своего')) return 'свой';
-  if (reason.includes('уже лечил себя') || reason.includes('не может лечить себя')) return 'лимит';
-  if (reason.includes('себя')) return 'сам';
-  return '';
+  return t.night.tag[reason.code] ?? '';
 }
 
-/** "№1 (дон), №2" — the Don is marked so the host knows whose word decides. */
-function actorList(actors: Player[]): string {
-  return actors.map((p) => `${seat(p)}${p.role === 'don' ? ' (дон)' : ''}`).join(', ');
+/** "#1 (Don), #2" — the Don is marked so the host knows whose word decides. */
+function actorList(t: Dict, actors: Player[]): string {
+  return actors.map((p) => `${t.num(p.seat)}${p.role === 'don' ? t.roles.donMark : ''}`).join(', ');
 }
 
 function BigCross() {
@@ -34,6 +30,8 @@ function BigCross() {
 
 export function NightScreen() {
   const state = useGame();
+  const t = useT();
+  const n = t.night;
   const dispatch = useApp((s) => s.dispatch);
   const showToast = useApp((s) => s.showToast);
   const view = getNightStepView(state);
@@ -56,16 +54,11 @@ export function NightScreen() {
   const hasDon = state.composition.don > 0;
   const actorIds = new Set(actors.map((p) => p.id));
 
+  const sc = t.script;
   const wakeText =
-    step === 'meeting'
-      ? hasDon
-        ? SCRIPT.meetingWithDon
-        : SCRIPT.meetingWake
-      : step === 'mafia' && hasDon
-        ? SCRIPT.mafiaWithDon
-        : SCRIPT.wake[step];
-  const sleepText = step === 'meeting' ? SCRIPT.meetingSleep : SCRIPT.sleep[step];
-  const lead = view.index === 0 ? `${SCRIPT.nightStart} ` : '';
+    step === 'meeting' ? (hasDon ? sc.meetingWithDon : sc.meetingWake) : step === 'mafia' && hasDon ? sc.mafiaWithDon : sc.wake[step];
+  const sleepText = step === 'meeting' ? sc.meetingSleep : sc.sleep[step];
+  const lead = view.index === 0 ? `${sc.nightStart} ` : '';
   const checkResult = step === 'commissar' ? getCommissarResult(state) : null;
   const donCheck = step === 'don' ? getDonResult(state) : null;
   const canShowAnswer = !blocked && !!choice && ((step === 'commissar' && checkResult) || (step === 'don' && donCheck));
@@ -74,7 +67,7 @@ export function NightScreen() {
     const opt = view.options.find((o) => o.player.id === p.id);
     if (!opt) return;
     if (!opt.allowed) {
-      if (opt.reason && !fake) showToast(opt.reason);
+      if (opt.reason && !fake) showToast(reasonText(t, opt.reason));
       return;
     }
     dispatch({ type: 'NightChoose', target: p.id });
@@ -82,10 +75,10 @@ export function NightScreen() {
 
   return (
     <main className="screen">
-      <nav className="steps" aria-label="Шаги ночи">
+      <nav className="steps" aria-label={n.stepsAria}>
         {night.steps.map((s, i) => (
           <span key={s} className={`steps__item${i === view.index ? ' is-current' : i < view.index ? ' is-done' : ''}`}>
-            {STEP_NAME[s]}
+            {t.steps[s]}
           </span>
         ))}
       </nav>
@@ -93,22 +86,22 @@ export function NightScreen() {
       <TypeLine text={lead + wakeText} />
 
       {step === 'meeting' && (
-        <div className="notice notice--host">Мафия: {actorList(actors)}. Действий нет — пусть просто посмотрят друг на друга.</div>
+        <div className="notice notice--host">{n.meetingNote(actorList(t, actors))}</div>
       )}
       {step !== 'meeting' && fake && (
-        <div className="notice notice--host">Роль выбыла. Произнесите текст и выдержите паузу, как обычно.</div>
+        <div className="notice notice--host">{n.fakeNote}</div>
       )}
       {step !== 'meeting' && !fake && !blocked && (
         <div className="notice notice--host">
-          Просыпается: {actorList(actors)}
-          {step === 'mafia' && actors.some((p) => p.role === 'don') && ' · решающее слово за доном'}
+          {n.wakes(actorList(t, actors))}
+          {step === 'mafia' && actors.some((p) => p.role === 'don') && n.donDecides}
         </div>
       )}
 
       {step !== 'meeting' && blocked && (
         <section className="blocked-card" aria-live="polite">
           <RoleIcon role="lover" className="blocked-card__lover" />
-          <div className="blocked-card__title">К {actors.length > 1 ? 'ним' : 'нему'} пришла любовница</div>
+          <div className="blocked-card__title">{n.blockedTitle(actors.length > 1)}</div>
           <div className="blocked-card__chips">
             {actors.map((p) => (
               <Chip key={p.id} player={p} look={{ inert: true, actor: true }} />
@@ -116,12 +109,12 @@ export function NightScreen() {
             <BigCross />
           </div>
           <p>
-            Этой ночью {actorList(actors)} не {actors.length > 1 ? 'делают' : 'делает'} ход — выбора нет.
-            {step === 'commissar' && ' Ответа комиссару не будет.'}
-            {step === 'don' && ' Ответа дону не будет.'}
+            {n.blockedText(actorList(t, actors), actors.length > 1)}
+            {step === 'commissar' && n.noAnswerCommissar}
+            {step === 'don' && n.noAnswerDon}
           </p>
           <p className="muted type" style={{ fontSize: 14 }}>
-            Произнесите текст, выдержите паузу. Этот экран можно показать игроку.
+            {n.blockedHint}
           </p>
         </section>
       )}
@@ -137,7 +130,7 @@ export function NightScreen() {
               actor,
               disabled: !opt?.allowed && !actor,
               inert: fake || !p.alive,
-              tag: actor ? 'ходит' : shortReason(opt?.reason ?? null, p),
+              tag: actor ? t.chip.acting : shortReason(t, opt?.reason ?? null, p),
             };
           }}
           onPick={choose}
@@ -147,11 +140,11 @@ export function NightScreen() {
       <div className="actions">
         {canShowAnswer && (
           <button type="button" className="btn btn--accent btn--block" onClick={() => setShowCheck(true)}>
-            {step === 'don' ? 'Показать ответ дону' : 'Показать ответ комиссару'}
+            {n.showAnswer(step === 'don')}
           </button>
         )}
         {choice !== undefined || fake || blocked || step === 'meeting' ? (
-          <div className="actions__hint">Скажите: «{sleepText}»</div>
+          <div className="actions__hint">{sc.say(sleepText)}</div>
         ) : null}
         <div className="actions__row">
           {step !== 'meeting' && !fake && !blocked && (
@@ -161,35 +154,35 @@ export function NightScreen() {
               aria-pressed={choice === null}
               onClick={() => dispatch({ type: 'NightChoose', target: null })}
             >
-              {step === 'mafia' ? 'Промах' : 'Пропуск'}
+              {step === 'mafia' ? n.miss : n.skip}
             </button>
           )}
           <button type="button" className="btn btn--primary" disabled={needsChoice || waitLeft > 0} onClick={() => dispatch({ type: 'Proceed' })}>
-            {waitLeft > 0 ? `Пауза · ${waitLeft} с` : isLast ? 'Город просыпается' : `Дальше: ${nextStep ? STEP_NAME[nextStep] : ''}`}
+            {waitLeft > 0 ? n.wait(waitLeft) : isLast ? n.wakeUp : n.nextStep(nextStep ? t.steps[nextStep] : '')}
           </button>
         </div>
       </div>
 
       {showCheck && step === 'commissar' && checkResult && (
-        <div className="overlay check-response" onClick={() => setShowCheck(false)} role="dialog" aria-label="Ответ комиссару">
-          <div className="eyebrow">ответ комиссару</div>
+        <div className="overlay check-response" onClick={() => setShowCheck(false)} role="dialog" aria-label={n.answerCommissar}>
+          <div className="eyebrow">{n.answerCommissar}</div>
           <div className="answer-sheet">
             {checkResult === 'mafia' && <Stamp kind="checked-mafia" big silent rotate={-6} />}
             {checkResult === 'notMafia' && <Stamp kind="checked-clean" big silent rotate={-4} />}
             {checkResult === 'noAnswer' && <Stamp kind="no-answer" big silent rotate={-3} />}
           </div>
-          <p className="muted type">Поверните экран к комиссару. Коснитесь, чтобы закрыть.</p>
+          <p className="muted type">{n.showToCommissar}</p>
         </div>
       )}
       {showCheck && step === 'don' && donCheck && (
-        <div className="overlay check-response" onClick={() => setShowCheck(false)} role="dialog" aria-label="Ответ дону">
-          <div className="eyebrow">ответ дону</div>
+        <div className="overlay check-response" onClick={() => setShowCheck(false)} role="dialog" aria-label={n.answerDon}>
+          <div className="eyebrow">{n.answerDon}</div>
           <div className="answer-sheet">
             {donCheck === 'commissar' && <Stamp kind="checked-commissar" big silent rotate={-6} />}
             {donCheck === 'notCommissar' && <Stamp kind="checked-not-commissar" big silent rotate={-4} />}
             {donCheck === 'noAnswer' && <Stamp kind="no-answer" big silent rotate={-3} />}
           </div>
-          <p className="muted type">Поверните экран к дону. Коснитесь, чтобы закрыть.</p>
+          <p className="muted type">{n.showToDon}</p>
         </div>
       )}
     </main>

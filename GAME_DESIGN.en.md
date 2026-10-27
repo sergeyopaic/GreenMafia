@@ -1105,6 +1105,7 @@ Proposal (❓ confirm the platform):
 | Interface | React + Vite, PWA | Installs on a phone like an app, works offline, no app stores. |
 | UI state | Zustand on top of the engine | Simple, no extra boilerplate. |
 | Storage | IndexedDB | The event log and game history. |
+| Languages | Russian (original) and English | Dictionaries in `app/src/i18n` (`ru.ts` is the master, `en.ts` has the same shape). The engine returns error codes with parameters; the app translates them. Stamps and the print kit are generated for each language. |
 | v2 server | Node.js + WebSocket | The same engine on the server. |
 
 Structure:

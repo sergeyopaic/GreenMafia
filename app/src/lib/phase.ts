@@ -1,5 +1,5 @@
 import type { GameState } from '@greenmafia/engine';
-import { STEP_NAME } from './text';
+import type { Dict } from '../i18n/dicts';
 
 export type Theme = 'night' | 'day';
 
@@ -9,31 +9,32 @@ export function themeOf(state: GameState | null): Theme {
   return t === 'reveal' || t === 'night' ? 'night' : 'day';
 }
 
-export function phaseTitle(state: GameState): { title: string; sub: string } {
+export function phaseTitle(state: GameState, t: Dict): { title: string; sub: string } {
   const ph = state.phase;
+  const p = t.phase;
   switch (ph.t) {
     case 'reveal':
-      return { title: 'Раздача', sub: `роль ${ph.index + 1} из ${state.players.length}` };
+      return { title: p.deal, sub: p.dealSub(ph.index + 1, state.players.length) };
     case 'night': {
       const step = state.nights[state.nights.length - 1]?.steps[ph.stepIndex];
-      return { title: `Ночь ${ph.number}`, sub: step ? STEP_NAME[step] : '' };
+      return { title: p.night(ph.number), sub: step ? t.steps[step] : '' };
     }
     case 'morning':
-      return { title: `День ${ph.number}`, sub: 'утро' };
+      return { title: p.day(ph.number), sub: p.morning };
     case 'lastWords':
-      return { title: `День ${ph.number}`, sub: 'последнее слово' };
+      return { title: p.day(ph.number), sub: p.lastWord };
     case 'discussion':
-      return { title: `День ${ph.number}`, sub: 'обсуждение' };
+      return { title: p.day(ph.number), sub: p.discussion };
     case 'voting':
       return {
-        title: `День ${ph.number}`,
-        sub: ph.kind === 'main' ? 'голосование' : ph.kind === 'revote' ? 'переголосование' : 'подъём всех',
+        title: p.day(ph.number),
+        sub: ph.kind === 'main' ? p.voting : ph.kind === 'revote' ? p.revote : p.allOut,
       };
     case 'defense':
-      return { title: `День ${ph.number}`, sub: 'защитная речь' };
+      return { title: p.day(ph.number), sub: p.defense };
     case 'verdict':
-      return { title: `День ${ph.number}`, sub: 'итог дня' };
+      return { title: p.day(ph.number), sub: p.verdict };
     case 'gameOver':
-      return { title: 'Дело закрыто', sub: 'финал' };
+      return { title: p.over, sub: p.overSub };
   }
 }

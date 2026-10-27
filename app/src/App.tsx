@@ -81,6 +81,12 @@ export function App() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'night' ? '#08160F' : '#EBE0C6');
   }, [theme]);
 
+  // The page language drives hyphenation, screen readers and the CSS-generated labels (:lang(en)).
+  const lang = useApp((s) => s.lang);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   useWakeLock(screen.name === 'game');
 
   return (

@@ -4,44 +4,47 @@ import { Chip } from '../../components/Chip';
 import { IdentityLine } from '../../components/Identity';
 import { Stamp } from '../../components/Stamp';
 import { TypeLine } from '../../components/TypeLine';
-import { SCRIPT, seat } from '../../lib/text';
+import { useT } from '../../i18n';
 import { play } from '../../lib/sound';
 import { useApp, useGame } from '../../store';
 
 /** §7.5, §14.5 — the morning paper. */
 export function MorningScreen() {
   const state = useGame();
+  const t = useT();
+  const m = t.morning;
   const dispatch = useApp((s) => s.dispatch);
   const report = getMorningReport(state);
-  useEffect(() => { play('morning', 0.7); }, []);
+  useEffect(() => {
+    play('morning', 0.7);
+  }, []);
   if (!report) return null;
   const deaths = report.deaths.map((d) => d.player);
 
   let headline: string;
-  if (report.meeting) headline = 'Город просыпается';
-  else if (deaths.length === 0) headline = 'Ночь прошла спокойно';
-  else if (deaths.length === 1) headline = `Этой ночью погиб ${seat(deaths[0]!)}`;
-  else headline = `Этой ночью погибли ${deaths.map(seat).join(' и ')}`;
+  if (report.meeting) headline = m.headlineMeeting;
+  else if (deaths.length === 0) headline = m.headlineQuiet;
+  else if (deaths.length === 1) headline = m.headlineOne(deaths[0]!);
+  else headline = m.headlineMany(deaths);
 
-  const lines = [SCRIPT.morningStart];
+  const lines = [t.script.morningStart];
   if (!report.meeting) {
-    if (deaths.length === 0) lines.push(SCRIPT.deathsNone);
-    else if (deaths.length === 1) lines.push(SCRIPT.deathsOne(deaths[0]!));
-    else lines.push(SCRIPT.deathsMany(deaths));
-    if (report.someoneSaved) lines.push(SCRIPT.saved);
-    if (report.alibi) lines.push(SCRIPT.alibi(report.alibi));
+    if (deaths.length === 0) lines.push(t.script.deathsNone);
+    else if (deaths.length === 1) lines.push(t.script.deathsOne(deaths[0]!));
+    else lines.push(t.script.deathsMany(deaths));
+    if (report.someoneSaved) lines.push(t.script.saved);
+    if (report.alibi) lines.push(t.script.alibi(report.alibi));
   }
 
   const lastWords = state.settings.lastWordNight && deaths.length > 0;
-  const next = state.pendingResult ? 'К финалу' : lastWords ? 'Последнее слово' : 'К обсуждению';
 
   return (
     <main className="screen">
       <article className="paper">
-        <div className="paper__mast">Вечерний город</div>
+        <div className="paper__mast">{m.mast}</div>
         <div className="paper__meta">
-          <span>утренний выпуск</span>
-          <span>день {report.number}</span>
+          <span>{m.edition}</span>
+          <span>{m.day(report.number)}</span>
         </div>
         <h2 className="paper__headline">{headline}</h2>
 
@@ -63,31 +66,32 @@ export function MorningScreen() {
 
         <div className="paper__body">
           {report.meeting ? (
-            <p>Первая ночь прошла без происшествий: мафия познакомилась и затаилась. Город начинает обсуждение.</p>
+            <p>{m.meetingBody}</p>
           ) : deaths.length === 0 ? (
-            <p>Жители проснулись в полном составе. Кто-то в городе не сомкнул глаз — но жертв нет.</p>
+            <p>{m.quietBody}</p>
           ) : (
             <p>
-              Следствие не называет виновных.
-              {state.settings.lastWordNight && ` ${deaths.length === 1 ? 'Погибшему' : 'Погибшим'} дадут сказать последнее слово.`}
+              {m.deathsBody}
+              {state.settings.lastWordNight && m.lastWordBody(deaths.length === 1)}
             </p>
           )}
           {report.alibi && (
             <p>
-              <b>Алиби.</b> У игрока {seat(report.alibi)} есть железное алиби: сегодня его нельзя выставить на голосование.
+              <b>{m.alibiLead}</b>
+              {m.alibiBody(report.alibi)}
             </p>
           )}
-          {report.someoneSaved && <p>По слухам, этой ночью кого-то спасли.</p>}
+          {report.someoneSaved && <p>{m.savedBody}</p>}
         </div>
       </article>
 
       <TypeLine text={lines.join(' ')} />
 
-      {state.pendingResult && <div className="notice">Игра окончена — по итогам ночи определён победитель.</div>}
+      {state.pendingResult && <div className="notice">{m.overNote}</div>}
 
       <div className="actions">
         <button type="button" className="btn btn--primary btn--block" onClick={() => dispatch({ type: 'Proceed' })}>
-          {next}
+          {m.next(!!state.pendingResult, lastWords)}
         </button>
       </div>
     </main>

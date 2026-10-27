@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { play, vibrate } from '../lib/sound';
+import { useT } from '../i18n';
 import { useApp } from '../store';
 import { IconRestart } from './icons';
 
@@ -14,6 +15,7 @@ function fmt(ms: number): string {
  */
 export function Timer({ seconds, autoStart = false, label }: { seconds: number; autoStart?: boolean; label?: string }) {
   const total = seconds * 1000;
+  const t = useT();
   const paused = useApp((s) => s.paused);
   const [left, setLeft] = useState(total);
   const [running, setRunning] = useState(autoStart);
@@ -52,7 +54,7 @@ export function Timer({ seconds, autoStart = false, label }: { seconds: number; 
   const ratio = left / total;
   const low = left > 0 && left <= 10_000;
   const over = left <= 0;
-  const state = over ? 'время вышло' : running ? (paused ? 'пауза' : 'идёт') : left === total ? 'нажмите, чтобы начать' : 'пауза';
+  const state = over ? t.timer.over : running ? (paused ? t.timer.paused : t.timer.running) : left === total ? t.timer.start : t.timer.paused;
 
   return (
     <div className={`timer${running && !paused ? ' is-running' : ''}${low ? ' is-low' : ''}${over ? ' is-over' : ''}`}>
@@ -61,7 +63,7 @@ export function Timer({ seconds, autoStart = false, label }: { seconds: number; 
         type="button"
         className="timer__face"
         onClick={() => (over ? undefined : setRunning((r) => !r))}
-        aria-label={running ? 'Пауза таймера' : 'Запустить таймер'}
+        aria-label={running ? t.timer.pauseAria : t.timer.startAria}
       >
         <span className="timer__digits">{fmt(left)}</span>
       </button>
@@ -82,7 +84,7 @@ export function Timer({ seconds, autoStart = false, label }: { seconds: number; 
               lastWholeSecond.current = seconds;
             }}
           >
-            <IconRestart width={14} height={14} /> заново
+            <IconRestart width={14} height={14} /> {t.timer.restart}
           </button>
         )}
       </div>

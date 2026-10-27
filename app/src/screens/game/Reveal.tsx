@@ -4,12 +4,14 @@ import { Chip } from '../../components/Chip';
 import { RoleArt } from '../../components/RoleArt';
 import { RoleBrief } from '../../components/RoleBrief';
 import { play } from '../../lib/sound';
-import { ROLE_NAME, TEAM_NAME } from '../../lib/text';
+import { useT } from '../../i18n';
 import { useApp, useGame } from '../../store';
 
 /** §14.3 — the phone goes around; each player holds the envelope to see their role. */
 export function RevealScreen() {
   const state = useGame();
+  const t = useT();
+  const r = t.reveal;
   const dispatch = useApp((s) => s.dispatch);
   const ph = state.phase.t === 'reveal' ? state.phase : null;
   const [stage, setStage] = useState<'pass' | 'open'>('pass');
@@ -49,15 +51,15 @@ export function RevealScreen() {
   if (stage === 'pass') {
     return (
       <main className="screen" style={{ justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-        <div className="eyebrow">передайте телефон</div>
+        <div className="eyebrow">{r.pass}</div>
         <div style={{ transform: 'scale(1.6)', margin: '24px 0 18px' }}>
           <Chip player={player} look={{ inert: true }} />
         </div>
         <h1>{player.name}</h1>
-        <p className="muted type">Остальные — отвернитесь от экрана.</p>
+        <p className="muted type">{r.turnAway}</p>
         <div className="actions" style={{ width: '100%' }}>
           <button type="button" className="btn btn--primary btn--block" onClick={() => setStage('open')}>
-            Это я, №{player.seat}
+            {r.itsMe(player.seat)}
           </button>
         </div>
       </main>
@@ -68,7 +70,7 @@ export function RevealScreen() {
   return (
     <main className="screen reveal-screen" style={{ alignItems: 'center' }}>
       <div className="eyebrow center">
-        №{player.seat}, {player.name}
+        {t.who(player)}
       </div>
       <div
         className={`envelope${open ? ' is-open' : ''}${detail ? ' envelope--brief' : ''}`}
@@ -88,13 +90,13 @@ export function RevealScreen() {
                 <RoleArt role={card.role} />
               </div>}
               <div className="role-card__foot">
-                <div className="role-card__name">{ROLE_NAME[card.role]}</div>
-                <div className="role-card__team">команда: {TEAM_NAME[ROLE_TEAM[card.role]]}</div>
+                <div className="role-card__name">{t.roles.name[card.role]}</div>
+                <div className="role-card__team">{r.team(t.roles.team[ROLE_TEAM[card.role]])}</div>
                 {detail && <RoleBrief role={card.role} settings={state.settings} firstNight />}
                 {card.partners.length > 0 && (
                   <div className="role-card__partners">
-                    Ваши сообщники:{' '}
-                    <b>{card.partners.map((p) => `№${p.seat}${p.role === 'don' ? ' (дон)' : ''}`).join(', ')}</b>
+                    {r.partners}{' '}
+                    <b>{card.partners.map((p) => `${t.num(p.seat)}${p.role === 'don' ? t.roles.donMark : ''}`).join(', ')}</b>
                     <div className="list__sub">{card.partners.map((p) => p.name).join(', ')}</div>
                   </div>
                 )}
@@ -106,12 +108,12 @@ export function RevealScreen() {
           <RoleArt role="back" />
           <div className="envelope__flap" />
           <div className="envelope__seal">GM</div>
-          <div className="envelope__hint">удерживайте, чтобы вскрыть</div>
+          <div className="envelope__hint">{r.hint}</div>
         </div>
       </div>
-      <div className="seg reveal-tabs" role="group" aria-label="Вид карточки">
-        <button type="button" aria-pressed={!detail} onClick={() => setDetail(false)}>Карта</button>
-        <button type="button" aria-pressed={detail} onClick={() => setDetail(true)}>Памятка</button>
+      <div className="seg reveal-tabs" role="group" aria-label={r.viewAria}>
+        <button type="button" aria-pressed={!detail} onClick={() => setDetail(false)}>{r.card}</button>
+        <button type="button" aria-pressed={detail} onClick={() => setDetail(true)}>{r.brief}</button>
       </div>
       <button
         type="button"
@@ -131,9 +133,9 @@ export function RevealScreen() {
         onKeyUp={() => setHolding(false)}
         onBlur={() => setHolding(false)}
         onContextMenu={(e) => e.preventDefault()}
-      >Удерживайте, чтобы {detail ? 'прочитать памятку' : 'увидеть роль'}</button>
+      >{r.hold(detail)}</button>
       <p className="muted type center" style={{ fontSize: 14 }}>
-        {detail ? 'Удерживайте кнопку и прокручивайте памятку. Отпустите — роль спрячется.' : 'Отпустите — и карта спрячется.'}
+        {r.release(detail)}
       </p>
       <div className="actions" style={{ width: '100%' }}>
         <button
@@ -142,7 +144,7 @@ export function RevealScreen() {
           disabled={!seen || holding}
           onClick={() => dispatch({ type: 'Proceed' })}
         >
-          {last ? 'Запомнил(а) — раздача окончена' : 'Запомнил(а) — передать дальше'}
+          {r.done(last)}
         </button>
       </div>
     </main>

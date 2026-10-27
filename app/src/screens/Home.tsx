@@ -2,8 +2,8 @@ import { type Player, replayTolerant } from '@greenmafia/engine';
 import { useMemo } from 'react';
 import { Chip } from '../components/Chip';
 import { IconSound } from '../components/icons';
+import { DICTS, LANGS, useT } from '../i18n';
 import { phaseTitle } from '../lib/phase';
-import { plural } from '../lib/text';
 import { useApp } from '../store';
 
 const DECOR: Player[] = [7, 1, 3].map((seat) => ({
@@ -18,16 +18,16 @@ const DECOR: Player[] = [7, 1, 3].map((seat) => ({
 }));
 
 export function HomeScreen() {
-  const { go, resumable, resume, sound, toggleSound } = useApp();
+  const { go, resumable, resume, sound, toggleSound, lang, setLang } = useApp();
+  const t = useT();
 
   const resumeInfo = useMemo(() => {
     if (!resumable) return null;
     const r = replayTolerant(resumable.events);
     if (!r.game) return null;
-    const { title, sub } = phaseTitle(r.game.state);
-    const n = r.game.state.players.length;
-    return `${title}, ${sub} · ${n} ${plural(n, 'игрок', 'игрока', 'игроков')}`;
-  }, [resumable]);
+    const { title, sub } = phaseTitle(r.game.state, t);
+    return `${title}, ${sub} · ${t.count.players(r.game.state.players.length)}`;
+  }, [resumable, t]);
 
   return (
     <main className="home">
@@ -47,27 +47,36 @@ export function HomeScreen() {
       <nav className="home__menu">
         {resumable && (
           <button type="button" className="btn btn--accent btn--block" onClick={resume} style={{ flexDirection: 'column', gap: 2 }}>
-            Продолжить игру
+            {t.home.continue}
             {resumeInfo && <span className="btn__sub">{resumeInfo}</span>}
           </button>
         )}
         <button type="button" className={`btn btn--block ${resumable ? 'btn--secondary' : 'btn--primary'}`} onClick={() => go({ name: 'setup' })}>
-          Новая игра
+          {t.home.newGame}
         </button>
         <button type="button" className="btn btn--secondary btn--block" onClick={() => go({ name: 'players' })}>
-          Игроки
+          {t.home.players}
         </button>
         <div className="actions__row">
           <button type="button" className="btn btn--secondary" onClick={() => go({ name: 'rules' })}>
-            Правила
+            {t.home.rules}
           </button>
           <button type="button" className="btn btn--secondary" onClick={() => go({ name: 'history' })}>
-            История
+            {t.home.history}
           </button>
         </div>
-        <button type="button" className="btn btn--ghost" onClick={toggleSound} style={{ alignSelf: 'center' }}>
-          <IconSound off={!sound} width={18} height={18} /> звук {sound ? 'включён' : 'выключен'}
-        </button>
+        <div className="home__footer">
+          <button type="button" className="btn btn--ghost" onClick={toggleSound}>
+            <IconSound off={!sound} width={18} height={18} /> {sound ? t.home.soundOn : t.home.soundOff}
+          </button>
+          <div className="lang-switch" role="group" aria-label={t.home.language}>
+            {LANGS.map((l) => (
+              <button type="button" key={l} aria-pressed={lang === l} onClick={() => setLang(l)} lang={l} title={DICTS[l].langName}>
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
       </nav>
     </main>
   );

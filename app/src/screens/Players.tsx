@@ -5,7 +5,7 @@ import { Confirm, Sheet } from '../components/Sheet';
 import { type GameEntry, finishedGames, formatRate, playerStats } from '../lib/playerStats';
 import { type PlayerProfile, MAX_NAME, cleanName, loadPlayers, makeProfile, nameError, savePlayers } from '../lib/players';
 import { loadHistory } from '../lib/storage';
-import { DEATH_CAUSE, ROLE_NAME, TEAM_NAME, plural } from '../lib/text';
+import { type Dict, useT } from '../i18n';
 import { useApp } from '../store';
 
 /** Profiles plus finished games, loaded once per screen. */
@@ -28,8 +28,8 @@ function usePlayerBase() {
   return { profiles, games, save };
 }
 
-function fmtDate(ts: number, withTime = false): string {
-  return new Date(ts).toLocaleString('ru-RU', {
+function fmtDate(ts: number, t: Dict, withTime = false): string {
+  return new Date(ts).toLocaleString(t.locale, {
     day: 'numeric',
     month: 'long',
     ...(withTime ? { hour: '2-digit', minute: '2-digit' } : { year: 'numeric' }),
@@ -40,7 +40,7 @@ function fmtDate(ts: number, withTime = false): string {
 export function Avatar({ name, big }: { name: string; big?: boolean }) {
   return (
     <span className={`avatar${big ? ' avatar--big' : ''}`} aria-hidden="true">
-      <span>{(name.trim()[0] ?? '?').toLocaleUpperCase('ru-RU')}</span>
+      <span>{(name.trim()[0] ?? '?').toLocaleUpperCase()}</span>
     </span>
   );
 }
@@ -49,6 +49,8 @@ export function Avatar({ name, big }: { name: string; big?: boolean }) {
 
 export function PlayersScreen() {
   const go = useApp((s) => s.go);
+  const tr = useT();
+  const pt = tr.players;
   const { profiles, games, save } = usePlayerBase();
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function PlayersScreen() {
 
   function add() {
     if (!profiles) return;
-    const err = nameError(profiles, draft);
+    const err = nameError(profiles, draft, undefined, pt.errors);
     if (err) {
       setError(err);
       return;
@@ -75,13 +77,13 @@ export function PlayersScreen() {
   return (
     <main className="screen">
       <header className="topbar">
-        <button type="button" className="icon-btn" onClick={() => go({ name: 'home' })} aria-label="Назад">
+        <button type="button" className="icon-btn" onClick={() => go({ name: 'home' })} aria-label={tr.common.back}>
           <IconBack />
         </button>
         <div className="topbar__title">
-          <b>Игроки</b>
+          <b>{pt.title}</b>
           <span>
-            {profiles.length} {plural(profiles.length, 'игрок', 'игрока', 'игроков')} в базе
+            {pt.inBase(profiles.length)}
           </span>
         </div>
       </header>
@@ -93,27 +95,27 @@ export function PlayersScreen() {
           add();
         }}
       >
-        <span className="folder__tab">новый игрок</span>
+        <span className="folder__tab">{pt.newPlayer}</span>
         <div className="name-row">
           <input
             className="input"
             value={draft}
             maxLength={MAX_NAME}
-            placeholder="Имя"
+            placeholder={tr.common.name}
             onChange={(e) => {
               setDraft(e.target.value);
               setError(null);
             }}
-            aria-label="Имя нового игрока"
+            aria-label={pt.newAria}
           />
           <button type="submit" className="btn btn--secondary" disabled={!cleanName(draft)}>
-            Добавить
+            {pt.add}
           </button>
         </div>
         {error && <p className="notice notice--warn" style={{ marginTop: 10 }}>{error}</p>}
       </form>
 
-      {rows.length === 0 && <p className="hand" style={{ fontSize: 22 }}>В базе пока никого нет.</p>}
+      {rows.length === 0 && <p className="hand" style={{ fontSize: 22 }}>{pt.empty}</p>}
       <div className="list">
         {rows.map(({ profile, stats }) => (
           <button type="button" key={profile.id} className="list__row player-row" onClick={() => go({ name: 'profile', id: profile.id })}>
@@ -122,8 +124,8 @@ export function PlayersScreen() {
               <div className="list__title">{profile.name}</div>
               <div className="list__sub">
                 {stats.games === 0
-                  ? 'ещё не играл'
-                  : `${stats.games} ${plural(stats.games, 'партия', 'партии', 'партий')} · ${stats.wins} ${plural(stats.wins, 'победа', 'победы', 'побед')}`}
+                  ? pt.notPlayed
+                  : `${tr.count.games(stats.games)} · ${tr.count.wins(stats.wins)}`}
               </div>
             </div>
             <span className="player-row__rate">{formatRate(stats.winRate)}</span>
@@ -140,6 +142,8 @@ const TEAMS: Team[] = ['town', 'mafia', 'maniac'];
 
 export function ProfileScreen({ id }: { id: string }) {
   const go = useApp((s) => s.go);
+  const tr = useT();
+  const pt = tr.players;
   const { profiles, games, save } = usePlayerBase();
   const [dialog, setDialog] = useState<null | 'rename' | 'delete'>(null);
   const [draft, setDraft] = useState('');
@@ -152,9 +156,9 @@ export function ProfileScreen({ id }: { id: string }) {
   if (!profile || !stats) {
     return (
       <main className="screen">
-        <p>Игрок не найден.</p>
+        <p>{pt.notFound}</p>
         <button type="button" className="btn btn--secondary" onClick={() => go({ name: 'players' })}>
-          К списку игроков
+          {pt.toList}
         </button>
       </main>
     );
@@ -162,7 +166,7 @@ export function ProfileScreen({ id }: { id: string }) {
 
   function rename() {
     if (!profiles || !profile) return;
-    const err = nameError(profiles, draft, profile.id);
+    const err = nameError(profiles, draft, profile.id, pt.errors);
     if (err) {
       setError(err);
       return;
@@ -176,75 +180,74 @@ export function ProfileScreen({ id }: { id: string }) {
   return (
     <main className="screen">
       <header className="topbar">
-        <button type="button" className="icon-btn" onClick={() => go({ name: 'players' })} aria-label="Назад">
+        <button type="button" className="icon-btn" onClick={() => go({ name: 'players' })} aria-label={tr.common.back}>
           <IconBack />
         </button>
         <div className="topbar__title">
           <b>{profile.name}</b>
-          <span>профиль игрока</span>
+          <span>{pt.profile}</span>
         </div>
       </header>
 
       <section className="profile-hero">
         <Avatar name={profile.name} big />
         <h1>{profile.name}</h1>
-        <p className="muted type">в базе с {fmtDate(profile.createdAt)}</p>
+        <p className="muted type">{pt.since(fmtDate(profile.createdAt, tr))}</p>
       </section>
 
       <div className="stat-tiles">
         <div className="stat-tile">
           <b>{stats.games}</b>
-          <span>{plural(stats.games, 'партия', 'партии', 'партий')}</span>
+          <span>{tr.count.gamesWord(stats.games)}</span>
         </div>
         <div className="stat-tile">
           <b>{stats.wins}</b>
-          <span>{plural(stats.wins, 'победа', 'победы', 'побед')}</span>
+          <span>{tr.count.winsWord(stats.wins)}</span>
         </div>
         <div className="stat-tile">
           <b>{formatRate(stats.winRate)}</b>
-          <span>побед</span>
+          <span>{pt.winRate}</span>
         </div>
         <div className="stat-tile">
           <b>{stats.survived}</b>
-          <span>дожил до конца</span>
+          <span>{pt.survived}</span>
         </div>
       </div>
 
       {stats.games === 0 ? (
         <p className="hand" style={{ fontSize: 21 }}>
-          {profile.name} ещё не сыграл ни одной партии. Статистика появится после первой игры.
+          {pt.noGames(profile.name)}
         </p>
       ) : (
         <>
           <section className="folder">
-            <span className="folder__tab">по командам</span>
+            <span className="folder__tab">{pt.byTeam}</span>
             <div className="list">
-              {TEAMS.filter((t) => stats.byTeam[t].games > 0).map((t) => (
-                <div className="list__row" key={t}>
+              {TEAMS.filter((team) => stats.byTeam[team].games > 0).map((team) => (
+                <div className="list__row" key={team}>
                   <div className="list__main">
-                    <div className="list__title">{TEAM_NAME[t]}</div>
+                    <div className="list__title">{tr.roles.team[team]}</div>
                     <div className="list__sub">
-                      {stats.byTeam[t].games} {plural(stats.byTeam[t].games, 'партия', 'партии', 'партий')} · {stats.byTeam[t].wins}{' '}
-                      {plural(stats.byTeam[t].wins, 'победа', 'победы', 'побед')}
+                      {tr.count.games(stats.byTeam[team].games)} · {tr.count.wins(stats.byTeam[team].wins)}
                     </div>
                   </div>
-                  <span className="player-row__rate">{formatRate(stats.byTeam[t].wins / stats.byTeam[t].games)}</span>
+                  <span className="player-row__rate">{formatRate(stats.byTeam[team].wins / stats.byTeam[team].games)}</span>
                 </div>
               ))}
             </div>
           </section>
 
           <section className="folder">
-            <span className="folder__tab">роли</span>
+            <span className="folder__tab">{pt.roles}</span>
             <div className="list">
               {playedRoles.map((r) => (
                 <div className="role-line" key={r}>
                   <RoleIcon role={r} className="role-line__icon" />
                   <div className="role-line__name">
-                    {ROLE_NAME[r]}
+                    {tr.roles.name[r]}
                     <div className="list__sub">
-                      {TEAM_NAME[ROLE_TEAM[r]]}
-                      {r === stats.favoriteRole && playedRoles.length > 1 ? ' · чаще всего' : ''}
+                      {tr.roles.team[ROLE_TEAM[r]]}
+                      {r === stats.favoriteRole && playedRoles.length > 1 ? pt.mostOften : ''}
                     </div>
                   </div>
                   <b className="player-row__rate">{stats.roles[r]}</b>
@@ -254,13 +257,13 @@ export function ProfileScreen({ id }: { id: string }) {
           </section>
 
           <section className="folder">
-            <span className="folder__tab">как выбывал</span>
+            <span className="folder__tab">{pt.howOut}</span>
             <div className="list">
               {[
-                ['Дожил до конца', stats.survived],
-                ['Убит ночью', stats.killedAtNight],
-                ['Изгнан голосованием', stats.exiled],
-                ['Удалён или ушёл', stats.removed],
+                [pt.outSurvived, stats.survived],
+                [pt.outNight, stats.killedAtNight],
+                [pt.outVote, stats.exiled],
+                [pt.outRemoved, stats.removed],
               ].map(([label, n]) => (
                 <div className="list__row" key={label} style={{ minHeight: 40, padding: '6px 0' }}>
                   <div className="list__main">{label}</div>
@@ -271,7 +274,7 @@ export function ProfileScreen({ id }: { id: string }) {
           </section>
 
           <section className="folder">
-            <span className="folder__tab">последние партии</span>
+            <span className="folder__tab">{pt.recent}</span>
             <div className="list">
               {stats.history.slice(0, 15).map((h) => (
                 <button
@@ -283,19 +286,19 @@ export function ProfileScreen({ id }: { id: string }) {
                   <RoleIcon role={h.role} width={26} height={26} />
                   <div className="list__main">
                     <div className="list__title">
-                      {ROLE_NAME[h.role]} · №{h.seat}
+                      {tr.roles.name[h.role]} · {tr.num(h.seat)}
                     </div>
                     <div className="list__sub">
-                      {fmtDate(h.date, true)} · {h.survived ? 'дожил до конца' : DEATH_CAUSE[h.deathCause ?? ''] ?? 'выбыл'}
+                      {fmtDate(h.date, tr, true)} · {h.survived ? pt.survived : (h.deathCause ? tr.death[h.deathCause as keyof Dict['death']] : null) ?? tr.chip.out}
                     </div>
                   </div>
                   <span className={`result-tag${h.won ? ' result-tag--win' : h.result.winner === 'draw' ? '' : ' result-tag--loss'}`}>
-                    {h.won ? 'победа' : h.result.winner === 'draw' ? 'ничья' : 'поражение'}
+                    {h.won ? pt.won : h.result.winner === 'draw' ? pt.draw : pt.lost}
                   </span>
                 </button>
               ))}
             </div>
-            {stats.history.length > 15 && <p className="list__sub">И ещё {stats.history.length - 15} — в архиве.</p>}
+            {stats.history.length > 15 && <p className="list__sub">{pt.more(stats.history.length - 15)}</p>}
           </section>
         </>
       )}
@@ -303,7 +306,7 @@ export function ProfileScreen({ id }: { id: string }) {
       <div className="actions">
         <div className="actions__row">
           <button type="button" className="btn btn--secondary" onClick={() => setDialog('delete')}>
-            Удалить
+            {tr.common.delete}
           </button>
           <button
             type="button"
@@ -314,13 +317,13 @@ export function ProfileScreen({ id }: { id: string }) {
               setDialog('rename');
             }}
           >
-            Переименовать
+            {pt.rename}
           </button>
         </div>
       </div>
 
       {dialog === 'rename' && (
-        <Sheet title="Новое имя" onClose={() => setDialog(null)}>
+        <Sheet title={pt.renameTitle} onClose={() => setDialog(null)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -337,16 +340,16 @@ export function ProfileScreen({ id }: { id: string }) {
                 setDraft(e.target.value);
                 setError(null);
               }}
-              aria-label="Новое имя"
+              aria-label={pt.renameTitle}
             />
             {error && <p className="notice notice--warn">{error}</p>}
-            <p className="list__sub">Статистика сохранится: прошлые партии привязаны к профилю, а не к имени.</p>
+            <p className="list__sub">{pt.renameNote}</p>
             <div className="actions__row">
               <button type="button" className="btn btn--secondary" onClick={() => setDialog(null)}>
-                Отмена
+                {tr.common.cancel}
               </button>
               <button type="submit" className="btn btn--primary btn--plain">
-                Сохранить
+                {tr.common.save}
               </button>
             </div>
           </form>
@@ -355,9 +358,9 @@ export function ProfileScreen({ id }: { id: string }) {
 
       {dialog === 'delete' && (
         <Confirm
-          title={`Удалить ${profile.name} из базы?`}
-          text="Партии останутся в архиве, но статистика этого игрока пропадёт. Если потом добавить игрока с тем же именем, старые партии к нему не вернутся."
-          okLabel="Удалить"
+          title={pt.deleteTitle(profile.name)}
+          text={pt.deleteText}
+          okLabel={tr.common.delete}
           danger
           onOk={() => {
             save(profiles.filter((p) => p.id !== profile.id));

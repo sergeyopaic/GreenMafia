@@ -1,6 +1,6 @@
 // GAME_DESIGN.md §18 — day scenarios 28–43.
 import { describe, expect, it } from 'vitest';
-import { getCurrentSpeaker, getEligibleVoters, getNominationOptions } from '../src';
+import { dispatch, getCurrentSpeaker, getEligibleVoters, getNominationOptions } from '../src';
 import {
   BASE,
   NINE,
@@ -39,6 +39,8 @@ describe('день: алиби', () => {
     expect(getCurrentSpeaker(g.state)?.seat).toBe(1);
     const msg = expectError(g, { type: 'Nominate', candidate: id(7) }, 'day.nominate');
     expect(msg).toBe('У №7 алиби');
+    const r = dispatch(g, { type: 'Nominate', candidate: id(7) });
+    expect(!r.ok && r.error.params).toEqual({ seat: 7, reason: 'nominate.alibi' });
     expect(getNominationOptions(g.state).find((o) => o.player.seat === 7)?.allowed).toBe(false);
     expect(getEligibleVoters(g.state).map((p) => p.seat)).toContain(7);
   });
