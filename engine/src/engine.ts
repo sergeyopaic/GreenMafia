@@ -132,6 +132,12 @@ export function applyEvent(prev: GameState | null, event: GameEvent): GameState 
     case 'Foul':
       foul(state, event.playerId);
       break;
+    case 'ChangeSeat':
+      changeSeat(state, event.playerId, event.seat);
+      break;
+    case 'RenamePlayer':
+      renamePlayer(state, event.playerId, event.name);
+      break;
     case 'EndGame':
       state.phase = {
         t: 'gameOver',
@@ -205,6 +211,29 @@ function foul(state: GameState, id: string): void {
   if (p.fouls >= 4) removePlayer(state, id, 'removed');
 }
 
+// ---------- Host's console: labels only, no effect on the rules ----------
+
+export const MAX_NAME_LENGTH = 20;
+
+function changeSeat(state: GameState, id: string, seat: number): void {
+  const p = getPlayer(state, id);
+  if (!Number.isInteger(seat) || seat < 1 || seat > MAX_SEAT) fail('seat.range', `Номера мест — от 1 до ${MAX_SEAT}`);
+  const holder = state.players.find((x) => x.seat === seat && x.id !== id);
+  if (holder) fail('seat.taken', `Номер ${seat} уже у игрока ${holder.name}`);
+  p.seat = seat;
+}
+
+function renamePlayer(state: GameState, id: string, name: string): void {
+  const p = getPlayer(state, id);
+  const clean = name.trim().replace(/\s+/g, ' ');
+  if (clean.length > MAX_NAME_LENGTH) fail('name.long', `Имя — не длиннее ${MAX_NAME_LENGTH} символов`);
+  const next = clean || `Игрок ${p.seat}`;
+  const key = next.toLocaleLowerCase('ru-RU');
+  const same = state.players.find((x) => x.id !== id && x.name.toLocaleLowerCase('ru-RU') === key);
+  if (same) fail('name.taken', `Имя «${same.name}» уже у №${same.seat}`);
+  p.name = next;
+}
+
 // ---------- Public API ----------
 
 function toError(err: unknown): EngineError {
@@ -240,6 +269,26 @@ export function replay(events: GameEvent[]): Result<Game> {
   } catch (err) {
     return { ok: false, error: toError(err) };
   }
+}
+
+/**
+ * Rebuilds as much of a saved game as possible: applies events until the first one that no longer
+ * passes the rules (e.g. a log saved by an older version) and drops it and everything after it.
+ * `game` is null only when the creation event itself is invalid.
+ */
+export function replayTolerant(events: GameEvent[]): { game: Game | null; dropped: number; error: EngineError | null } {
+  let state: GameState | null = null;
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i] as GameEvent;
+    try {
+      state = applyEvent(state, e);
+    } catch (err) {
+      const error = toError(err);
+      const game = state ? { events: events.slice(0, i), state } : null;
+      return { game, dropped: events.length - i, error };
+    }
+  }
+  return { game: state ? { events: [...events], state } : null, dropped: 0, error: null };
 }
 
 /** Undo the last action. Game creation itself cannot be undone. */

@@ -179,4 +179,8 @@ export type GameEvent =
   | { type: 'CastVotes'; voters?: Record<string, string[]>; counts?: Record<string, number> }
   | { type: 'RemovePlayer'; playerId: string; cause: 'removed' | 'left' }
   | { type: 'Foul'; playerId: string }
+  /** Host's console: the number is only a label, so it can be fixed at any time. */
+  | { type: 'ChangeSeat'; playerId: string; seat: number }
+  /** Host's console: fix a name in this game (the profile in the player base is not touched). */
+  | { type: 'RenamePlayer'; playerId: string; name: string }
   | { type: 'EndGame'; result: 'draw' | 'aborted' };

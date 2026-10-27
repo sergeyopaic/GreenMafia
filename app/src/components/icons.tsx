@@ -98,6 +98,12 @@ export const IconSound = ({ off, ...p }: P & { off?: boolean }) => (
     {off ? <path d="M17 9l5 6M22 9l-5 6" /> : <path d="M17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12" />}
   </Svg>
 );
+export const IconPen = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 20h4L19 9l-4-4L4 16z" />
+    <path d="M13.5 6.5l4 4" />
+  </Svg>
+);
 export const IconStop = (p: P) => (
   <Svg {...p}>
     <rect x="5" y="5" width="14" height="14" rx="1.5" />

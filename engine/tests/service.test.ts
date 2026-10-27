@@ -9,6 +9,7 @@ import {
   newGame,
   recommendedComposition,
   replay,
+  replayTolerant,
   undo,
   validateComposition,
 } from '../src';
@@ -52,7 +53,18 @@ describe('отмена и журнал', () => {
     if (r.ok) expect(r.value.state).toEqual(g.state);
   });
 
-  it('создание игры отменить нельзя', () => {
+  it('журнал с недопустимым действием восстанавливается до последнего корректного', () => {
+    let g = setup(NINE);
+    g = proceed(g);
+    const events = [...g.events, { type: 'Nominate' as const, candidate: id(2) }, { type: 'Proceed' as const }];
+    const r = replayTolerant(events);
+    expect(r.dropped).toBe(2);
+    expect(r.error?.code).toBeTruthy();
+    expect(r.game?.state).toEqual(g.state);
+    expect(replayTolerant(g.events).dropped).toBe(0);
+  });
+
+    it('создание игры отменить нельзя', () => {
     const g = setup(NINE);
     expect(canUndo(g)).toBe(false);
     expect(undo(g)).toBe(g);

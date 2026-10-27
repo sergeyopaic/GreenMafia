@@ -1,4 +1,4 @@
-import { replay } from '@greenmafia/engine';
+import { replayTolerant } from '@greenmafia/engine';
 import { useEffect, useState } from 'react';
 import { IconBack } from '../components/icons';
 import { type SavedGame, loadHistory } from '../lib/storage';
@@ -32,9 +32,9 @@ export function HistoryScreen() {
       {items && items.length === 0 && <p className="hand" style={{ fontSize: 22 }}>Архив пуст. Сыграйте первую партию.</p>}
       <div className="list">
         {items?.map((g) => {
-          const r = replay(g.events);
-          if (!r.ok) return null;
-          const s = r.value.state;
+          const r = replayTolerant(g.events);
+          if (!r.game) return null;
+          const s = r.game.state;
           const res = s.phase.t === 'gameOver' ? s.phase.result : null;
           const n = s.players.length;
           return (
@@ -62,7 +62,7 @@ export function HistoryScreen() {
 
 export function ArchiveScreen({ saved, back }: { saved: SavedGame; back?: Screen }) {
   const go = useApp((s) => s.go);
-  const r = replay(saved.events);
+  const r = replayTolerant(saved.events);
   return (
     <main className="screen">
       <header className="topbar">
@@ -74,7 +74,7 @@ export function ArchiveScreen({ saved, back }: { saved: SavedGame; back?: Screen
           <span>из архива</span>
         </div>
       </header>
-      {r.ok ? <CaseFile state={r.value.state} animate={false} /> : <p>Не удалось прочитать дело.</p>}
+      {r.game ? <CaseFile state={r.game.state} animate={false} /> : <p>Не удалось прочитать дело.</p>}
     </main>
   );
 }

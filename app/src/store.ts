@@ -5,7 +5,7 @@ import {
   canUndo,
   dispatch as engineDispatch,
   newGame,
-  replay,
+  replayTolerant,
   undo as engineUndo,
 } from '@greenmafia/engine';
 import { create } from 'zustand';
@@ -108,8 +108,9 @@ export const useApp = create<AppState>((set, get) => ({
     setSoundEnabled(prefs.sound);
     let resumable: SavedGame | null = null;
     if (current) {
-      const r = replay(current.events);
-      if (r.ok && r.value.state.phase.t !== 'gameOver') resumable = current;
+      // Tolerant: a log from an older version keeps everything up to the first invalid action.
+      const r = replayTolerant(current.events);
+      if (r.game && r.game.state.phase.t !== 'gameOver') resumable = current;
     }
     set({ ready: true, resumable, sound: prefs.sound });
   },
@@ -143,21 +144,28 @@ export const useApp = create<AppState>((set, get) => ({
   resume() {
     const saved = get().resumable;
     if (!saved) return;
-    const r = replay(saved.events);
-    if (!r.ok) {
-      get().showToast(`Не удалось восстановить игру: ${r.error.message}`);
+    const r = replayTolerant(saved.events);
+    if (!r.game) {
+      get().showToast(`Не удалось восстановить игру: ${r.error?.message ?? 'журнал повреждён'}`);
       void clearCurrent();
       set({ resumable: null });
       return;
     }
+    const game = r.game;
+    if (r.dropped > 0) {
+      get().showToast(
+        `Последние действия (${r.dropped}) не прошли проверку правил и отброшены. Игра продолжена с последнего корректного шага.`,
+      );
+      persist(saved.id, saved.createdAt, game);
+    }
     set({
-      game: r.value,
+      game,
       gameId: saved.id,
       createdAt: saved.createdAt,
       screen: { name: 'game' },
       resumable: null,
       // Resumed in the middle of the deal: the phone still has to come back to the host.
-      handBackAck: r.value.state.phase.t !== 'reveal',
+      handBackAck: game.state.phase.t !== 'reveal',
       paused: false,
     });
   },

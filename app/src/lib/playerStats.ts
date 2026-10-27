@@ -1,7 +1,7 @@
 // Player statistics computed from the finished games in the history. Nothing is stored separately:
 // the history is the source of truth, so stats stay correct after undo or deleting a game.
 
-import { type GameResult, type GameState, type Player, ROLES, ROLE_TEAM, type Role, type Team, replay } from '@greenmafia/engine';
+import { type GameResult, type GameState, type Player, ROLES, ROLE_TEAM, type Role, type Team, replayTolerant } from '@greenmafia/engine';
 import { type PlayerProfile, isProfileId, normalizeName } from './players';
 import type { SavedGame } from './storage';
 
@@ -51,11 +51,11 @@ export interface PlayerStats {
 export function finishedGames(history: readonly SavedGame[]): GameEntry[] {
   const out: GameEntry[] = [];
   for (const saved of history) {
-    const r = replay(saved.events);
-    if (!r.ok || r.value.state.phase.t !== 'gameOver') continue;
-    const result = r.value.state.phase.result;
+    const r = replayTolerant(saved.events);
+    if (!r.game || r.game.state.phase.t !== 'gameOver') continue;
+    const result = r.game.state.phase.result;
     if (result.winner === 'aborted') continue;
-    out.push({ saved, state: r.value.state, result, date: saved.finishedAt ?? saved.createdAt });
+    out.push({ saved, state: r.game.state, result, date: saved.finishedAt ?? saved.createdAt });
   }
   return out.sort((a, b) => b.date - a.date);
 }

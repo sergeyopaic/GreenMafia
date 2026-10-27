@@ -1,7 +1,7 @@
 // Seat numbers dealt from table cards 1–20 are only labels: the order is the seating order.
 import { describe, expect, it } from 'vitest';
-import { CLASSIC_SETTINGS, type CreateGameEvent, type Role, emptyComposition, getCurrentSpeaker, newGame } from '../src';
-import { act, night, proceed, skipDay, toDiscussion } from './helpers';
+import { CLASSIC_SETTINGS, type CreateGameEvent, type Role, emptyComposition, getCurrentSpeaker, newGame, undo } from '../src';
+import { act, expectError, night, proceed, skipDay, toDiscussion } from './helpers';
 
 function create(seats: (number | undefined)[], roles: Role[], settings = {}): ReturnType<typeof newGame> {
   const composition = emptyComposition();
@@ -84,5 +84,46 @@ describe('произвольные номера мест', () => {
     expect(!range.ok && range.error.code).toBe('players.seatRange');
     const partial = create([1, 2, undefined, 4, 5], ROLES5);
     expect(!partial.ok && partial.error.code).toBe('players.seats');
+  });
+});
+
+describe('пульт ведущего: номер и имя', () => {
+  function started() {
+    const r = create(SEATS5, ROLES5);
+    if (!r.ok) throw new Error(r.error.message);
+    return toDiscussion(proceed(r.value));
+  }
+
+  it('номер меняется на свободный, порядок речей не меняется', () => {
+    let g = started();
+    const order = g.state.days[0]?.order;
+    g = act(g, { type: 'ChangeSeat', playerId: 'u0', seat: 7 });
+    expect(g.state.players.find((p) => p.id === 'u0')?.seat).toBe(7);
+    expect(g.state.days[0]?.order).toEqual(order);
+    expect(g.state.players.map((p) => p.id)).toEqual(['u0', 'u1', 'u2', 'u3', 'u4']);
+  });
+
+  it('занятый номер и номер вне 1–20 — ошибка', () => {
+    const g = started();
+    expect(expectError(g, { type: 'ChangeSeat', playerId: 'u0', seat: 3 }, 'seat.taken')).toContain('Номер 3');
+    expectError(g, { type: 'ChangeSeat', playerId: 'u0', seat: 21 }, 'seat.range');
+  });
+
+  it('номер можно поменять и выбывшему', () => {
+    let g = started();
+    g = act(g, { type: 'RemovePlayer', playerId: 'u3', cause: 'left' });
+    g = act(g, { type: 'ChangeSeat', playerId: 'u3', seat: 1 });
+    expect(g.state.players.find((p) => p.id === 'u3')?.seat).toBe(1);
+  });
+
+  it('имя исправляется; пустое — «Игрок N»; смена отменяется', () => {
+    let g = started();
+    g = act(g, { type: 'RenamePlayer', playerId: 'u1', name: '  Мика  ' });
+    expect(g.state.players.find((p) => p.id === 'u1')?.name).toBe('Мика');
+    g = act(g, { type: 'RenamePlayer', playerId: 'u1', name: '' });
+    expect(g.state.players.find((p) => p.id === 'u1')?.name).toBe('Игрок 3');
+    expectError(g, { type: 'RenamePlayer', playerId: 'u1', name: 'x'.repeat(21) }, 'name.long');
+    expectError(g, { type: 'RenamePlayer', playerId: 'u0', name: 'игрок 3' }, 'name.taken');
+    expect(undo(g).state.players.find((p) => p.id === 'u1')?.name).toBe('Мика');
   });
 });

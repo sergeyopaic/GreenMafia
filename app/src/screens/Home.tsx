@@ -1,4 +1,4 @@
-import { type Player, replay } from '@greenmafia/engine';
+import { type Player, replayTolerant } from '@greenmafia/engine';
 import { useMemo } from 'react';
 import { Chip } from '../components/Chip';
 import { IconSound } from '../components/icons';
@@ -22,10 +22,10 @@ export function HomeScreen() {
 
   const resumeInfo = useMemo(() => {
     if (!resumable) return null;
-    const r = replay(resumable.events);
-    if (!r.ok) return null;
-    const { title, sub } = phaseTitle(r.value.state);
-    const n = r.value.state.players.length;
+    const r = replayTolerant(resumable.events);
+    if (!r.game) return null;
+    const { title, sub } = phaseTitle(r.game.state);
+    const n = r.game.state.players.length;
     return `${title}, ${sub} · ${n} ${plural(n, 'игрок', 'игрока', 'игроков')}`;
   }, [resumable]);
 

@@ -2213,3 +2213,22 @@ p {
 .seat-grid .chip__disc {
   width: min(56px, 15vw);
 }
+
+.mini-chip--empty {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+  border: 0;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+
+.mini-chip--empty::before {
+  display: none;
+}
+
+.seat-pick .mini-chip--empty {
+  border: 2px dashed var(--stamp);
+  box-shadow: none;
+  color: var(--stamp);
+}
