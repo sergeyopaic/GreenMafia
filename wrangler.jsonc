@@ -1,0 +1,14 @@
+// Cloudflare deployment. GreenMafia is a static PWA: there is no Worker code,
+// only the built files in app/dist/, served as assets.
+// Build with `npm ci && npm run build`, then deploy with `npx wrangler deploy`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Must match the name of the project in the Cloudflare dashboard.
+  "name": "greenmafia",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./app/dist",
+    // The app has a single page; any path that is not a file gets index.html.
+    "not_found_handling": "single-page-application"
+  }
+}
