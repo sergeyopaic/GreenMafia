@@ -1,7 +1,8 @@
-import { getMorningReport } from '@greenmafia/engine';
-import { useEffect } from 'react';
-import { Chip } from '../../components/Chip';
+import { getDayOneOpener, getMorningReport } from '@greenmafia/engine';
+import { useEffect, useState } from 'react';
+import { Chip, MiniChip } from '../../components/Chip';
 import { IdentityLine } from '../../components/Identity';
+import { PlayerPicker } from '../../components/Sheet';
 import { Stamp } from '../../components/Stamp';
 import { TypeLine } from '../../components/TypeLine';
 import { useT } from '../../i18n';
@@ -15,6 +16,8 @@ export function MorningScreen() {
   const m = t.morning;
   const dispatch = useApp((s) => s.dispatch);
   const report = getMorningReport(state);
+  const opener = getDayOneOpener(state);
+  const [picking, setPicking] = useState(false);
   useEffect(() => {
     play('morning', 0.7);
   }, []);
@@ -37,6 +40,8 @@ export function MorningScreen() {
   }
 
   const lastWords = state.settings.lastWordNight && deaths.length > 0;
+  // One paragraph reads as a single column; two columns would split the sentence in half.
+  const paragraphs = 1 + (report.alibi ? 1 : 0) + (report.someoneSaved ? 1 : 0);
 
   return (
     <main className="screen">
@@ -64,7 +69,7 @@ export function MorningScreen() {
           </div>
         )}
 
-        <div className="paper__body">
+        <div className={paragraphs > 1 ? 'paper__body' : 'paper__body paper__body--single'}>
           {report.meeting ? (
             <p>{m.meetingBody}</p>
           ) : deaths.length === 0 ? (
@@ -88,6 +93,36 @@ export function MorningScreen() {
       <TypeLine text={lines.join(' ')} />
 
       {state.pendingResult && <div className="notice">{m.overNote}</div>}
+
+      {opener && (
+        <section className="folder opener">
+          <span className="folder__tab">{m.openerLabel}</span>
+          <div className="opener__who">
+            <MiniChip player={opener.opener} />
+            <div>
+              <b>{t.who(opener.opener)}</b>
+              <div className="list__sub">{opener.chosen ? m.openerChosen : m.openerDefault}</div>
+            </div>
+          </div>
+          {opener.order.length > 1 && <p className="list__sub">{m.openerOrder(t.nums(opener.order.slice(1)))}</p>}
+          <button type="button" className="btn btn--secondary btn--block" onClick={() => setPicking(true)}>
+            {m.openerChange}
+          </button>
+        </section>
+      )}
+      {opener && picking && (
+        <PlayerPicker
+          title={m.openerTitle}
+          hint={m.openerHint}
+          players={state.players}
+          allowed={(p) => p.alive}
+          look={(p) => ({ selected: p.id === opener.opener.id })}
+          onPick={(p) => {
+            if (dispatch({ type: 'ChooseFirstSpeaker', playerId: p.id })) setPicking(false);
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
 
       <div className="actions">
         <button type="button" className="btn btn--primary btn--block" onClick={() => dispatch({ type: 'Proceed' })}>

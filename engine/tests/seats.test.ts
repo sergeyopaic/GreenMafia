@@ -1,6 +1,6 @@
 // Seat numbers dealt from table cards 1–20 are only labels: the order is the seating order.
 import { describe, expect, it } from 'vitest';
-import { CLASSIC_SETTINGS, type CreateGameEvent, type Role, emptyComposition, getCurrentSpeaker, newGame, undo } from '../src';
+import { CLASSIC_SETTINGS, type CreateGameEvent, type Game, type Role, emptyComposition, getCurrentSpeaker, getDayOneOpener, newGame, undo } from '../src';
 import { act, expectError, night, proceed, skipDay, toDiscussion } from './helpers';
 
 function create(seats: (number | undefined)[], roles: Role[], settings = {}): ReturnType<typeof newGame> {
@@ -125,5 +125,75 @@ describe('пульт ведущего: номер и имя', () => {
     expectError(g, { type: 'RenamePlayer', playerId: 'u1', name: 'x'.repeat(21) }, 'name.long');
     expectError(g, { type: 'RenamePlayer', playerId: 'u0', name: 'игрок 3' }, 'name.taken');
     expect(undo(g).state.players.find((p) => p.id === 'u1')?.name).toBe('Мика');
+  });
+});
+
+describe('кто начинает первый день', () => {
+  // Seated clockwise with cards 12, 3, 20, 8, 15 (ids u0…u4).
+  const seatsOf = (g: Game, day: number) => g.state.days[day]!.order.map((id) => g.state.players.find((p) => p.id === id)!.seat);
+  function morning1(settings = {}): Game {
+    const r = create(SEATS5, ROLES5, settings);
+    if (!r.ok) throw new Error(r.error.message);
+    const g = proceed(r.value); // meeting night → morning of day 1
+    expect(g.state.phase).toMatchObject({ t: 'morning', number: 1 });
+    return g;
+  }
+
+  it('по умолчанию начинает первый по посадке, выбор ведущего не нужен', () => {
+    const g = morning1();
+    expect(getDayOneOpener(g.state)).toMatchObject({ chosen: false, opener: { seat: 12 } });
+    expect(seatsOf(toDiscussion(g), 0)).toEqual([12, 3, 20, 8, 15]);
+  });
+
+  it('ведущий выбирает открывающего; дальше — следующий по посадке, а не по номеру', () => {
+    let g = act(morning1(), { type: 'ChooseFirstSpeaker', playerId: 'u2' }); // card 20
+    const preview = getDayOneOpener(g.state)!;
+    expect(preview.chosen).toBe(true);
+    expect(preview.order.map((p) => p.seat)).toEqual([20, 8, 15, 12, 3]);
+    g = toDiscussion(g);
+    expect(getCurrentSpeaker(g.state)?.seat).toBe(20);
+    expect(seatsOf(g, 0)).toEqual([20, 8, 15, 12, 3]); // №8 after №20, №3 last — seating, not numbers
+    g = proceed(g);
+    expect(getCurrentSpeaker(g.state)?.seat).toBe(8);
+    // Day 2 (rotating): the player seated after day 1's opener.
+    g = toDiscussion(night(skipDay(g)));
+    expect(seatsOf(g, 1)).toEqual([8, 15, 12, 3, 20]);
+  });
+
+  it('fromFirst: каждый день снова с выбранного, а если он выбыл — со следующего за ним по посадке', () => {
+    let g = act(morning1({ speakingOrder: 'fromFirst' }), { type: 'ChooseFirstSpeaker', playerId: 'u3' }); // card 8
+    g = toDiscussion(g);
+    expect(seatsOf(g, 0)).toEqual([8, 15, 12, 3, 20]);
+    g = night(skipDay(g));
+    g = toDiscussion(g);
+    expect(seatsOf(g, 1)).toEqual([8, 15, 12, 3, 20]);
+    g = night(skipDay(g));
+    g = act(g, { type: 'RemovePlayer', playerId: 'u3', cause: 'left' }); // card 8 leaves on morning 3
+    g = toDiscussion(g);
+    expect(seatsOf(g, 2)).toEqual([15, 12, 3, 20]);
+  });
+
+  it('выбирают только утром первого дня и только живого; выбор можно сменить и отменить', () => {
+    let g = morning1();
+    g = act(g, { type: 'ChooseFirstSpeaker', playerId: 'u2' });
+    g = act(g, { type: 'ChooseFirstSpeaker', playerId: 'u4' }); // changed their mind: card 15
+    expect(getDayOneOpener(g.state)?.opener.seat).toBe(15);
+    expect(getDayOneOpener(undo(g).state)?.opener.seat).toBe(20);
+    expectError(g, { type: 'ChooseFirstSpeaker', playerId: 'nobody' }, 'player.unknown');
+    g = toDiscussion(g);
+    expect(getDayOneOpener(g.state)).toBeNull();
+    expectError(g, { type: 'ChooseFirstSpeaker', playerId: 'u0' }, 'opener.phase');
+    // A player killed on a full first night cannot open the day.
+    const r = create(SEATS5, ROLES5, { firstNight: 'full' });
+    if (!r.ok) throw new Error(r.error.message);
+    let full = r.value;
+    while (full.state.phase.t === 'night') {
+      const step = full.state.nights[0]?.steps[full.state.phase.stepIndex];
+      full = act(full, { type: 'NightChoose', target: step === 'mafia' ? 'u0' : null }); // mafia kills card 12
+      full = proceed(full);
+    }
+    expect(full.state.phase).toMatchObject({ t: 'morning', number: 1 });
+    expectError(full, { type: 'ChooseFirstSpeaker', playerId: 'u0' }, 'opener.out');
+    expect(getDayOneOpener(full.state)?.opener.seat).toBe(3); // default skips the dead
   });
 });

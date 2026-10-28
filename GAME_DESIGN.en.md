@@ -386,8 +386,9 @@ Contains:
 ### 8.2. Speaking order
 
 - The speaking order is the **seating order**, not the numbers: #13 may speak before #10.
-- Day 1 is opened by the first player in seating order.
-- Each following day is opened by the **next living player** after the one who opened the previous day (in seating order) ⚙️ (by default **rotate around the table**; alternative — always the first living player).
+- Day 1 is opened by the player the **host chooses** on the morning of day 1 (the players agree on it with the host; the `ChooseFirstSpeaker` event). Without a choice — the first living player in seating order. Only a living player can be chosen, and only before the discussion starts; the choice can be changed or undone.
+- After that the floor goes **around the table from the chosen player, in seating order**, not by number: if the third player in seating order opened, the fourth in seating order speaks next, whatever their numbers.
+- Each following day is opened by the **next living player** after the one who opened the previous day (in seating order) ⚙️ (by default **rotate around the table**; alternative `fromFirst` — every day the day 1 opener again, or the next living player after them in seating order if they are out).
 - Players who are out are skipped.
 
 ### 8.3. Nominating candidates

@@ -1,7 +1,7 @@
 // Read-only helpers for the UI. They never change the state.
 
 import type { Reason } from './errors';
-import { currentSpeaker, eligibleVoters, hasAlibi, nominationError } from './day';
+import { currentSpeaker, eligibleVoters, firstSpeakerFor, hasAlibi, nominationError, speakingOrderFrom } from './day';
 import { currentNight, findPlayer } from './helpers';
 import { commissarResult, currentStep, donResult, isMafiaTeam, isStepBlocked, isStepFake, stepActors, targetError } from './night';
 import { ROLE_TEAM } from './roles';
@@ -145,4 +145,15 @@ export function getWinners(state: GameState): Player[] {
   const w = state.phase.result.winner;
   if (w === 'draw' || w === 'aborted') return [];
   return state.players.filter((p) => ROLE_TEAM[p.role] === w);
+}
+
+/**
+ * Morning of day 1: who will open the discussion and the order around the table from them.
+ * `chosen` is true when the host picked the opener; null when it can no longer be chosen.
+ */
+export function getDayOneOpener(state: GameState): { opener: Player; order: Player[]; chosen: boolean } | null {
+  const ph = state.phase;
+  if (ph.t !== 'morning' || ph.number !== 1 || state.days.length > 0 || state.pendingResult) return null;
+  const opener = firstSpeakerFor(state);
+  return { opener, order: speakingOrderFrom(state, opener), chosen: state.dayOneOpener !== undefined };
 }

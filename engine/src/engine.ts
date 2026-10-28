@@ -4,6 +4,7 @@
 import {
   afterDayRemoval,
   castVotes,
+  chooseFirstSpeaker,
   defenseProceed,
   discussionProceed,
   lastWordsProceed,
@@ -137,6 +138,9 @@ export function applyEvent(prev: GameState | null, event: GameEvent): GameState 
       break;
     case 'RenamePlayer':
       renamePlayer(state, event.playerId, event.name);
+      break;
+    case 'ChooseFirstSpeaker':
+      chooseFirstSpeaker(state, event.playerId);
       break;
     case 'EndGame':
       state.phase = {

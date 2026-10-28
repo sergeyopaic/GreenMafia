@@ -150,6 +150,11 @@ export interface GameState {
   alibi: { day: number; playerId: string } | null;
   /** Win detected but not announced yet (morning / verdict screens). */
   pendingResult: GameResult | null;
+  /**
+   * Who the host chose to open day 1 (agreed with the players), or absent for the default:
+   * the first alive player in seating order. Speeches then go around the table from them.
+   */
+  dayOneOpener?: string;
 }
 
 // ---------- Events ----------
@@ -183,4 +188,6 @@ export type GameEvent =
   | { type: 'ChangeSeat'; playerId: string; seat: number }
   /** Host's console: fix a name in this game (the profile in the player base is not touched). */
   | { type: 'RenamePlayer'; playerId: string; name: string }
+  /** Morning of day 1: who opens the discussion. The order then follows the seating, not the numbers. */
+  | { type: 'ChooseFirstSpeaker'; playerId: string }
   | { type: 'EndGame'; result: 'draw' | 'aborted' };

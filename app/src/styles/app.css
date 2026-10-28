@@ -2375,3 +2375,11 @@ p {
 .rule-profile__pick .list__title { overflow-wrap: anywhere; }
 .rule-profile__pick[aria-pressed='true'] .list__title { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .rule-profile__pick[aria-pressed='true'] .list__sub { color: var(--accent); }
+
+/* A single paragraph in the morning paper: one centred column instead of a sentence split in two. */
+.paper__body p { break-inside: avoid; }
+.paper__body--single { columns: auto; column-rule: none; text-align: center; font-size: 16px; hyphens: manual; }
+
+/* Day 1 morning: who opens the discussion */
+.opener { display: grid; gap: 10px; }
+.opener__who { display: flex; align-items: center; gap: 12px; }

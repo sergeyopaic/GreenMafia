@@ -82,6 +82,7 @@ function event(value: unknown): GameEvent | null {
     case 'Foul': return id(value.playerId) ? { type: 'Foul', playerId: value.playerId } : null;
     case 'ChangeSeat': return id(value.playerId) && integer(value.seat, 1, 20) ? value as unknown as GameEvent : null;
     case 'RenamePlayer': return id(value.playerId) && typeof value.name === 'string' ? value as unknown as GameEvent : null;
+    case 'ChooseFirstSpeaker': return id(value.playerId) ? { type: 'ChooseFirstSpeaker', playerId: value.playerId } : null;
     case 'EndGame': return value.result === 'draw' || value.result === 'aborted' ? { type: 'EndGame', result: value.result } : null;
     default: return null;
   }

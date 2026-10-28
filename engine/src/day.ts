@@ -48,28 +48,54 @@ export function lastWordsProceed(state: GameState): void {
 
 // ---------- Discussion ----------
 
-/** §8.2 */
+/** `id` if that player is alive, otherwise the next alive player after them in seating order (`null` = from the start). */
+function fromSeat(state: GameState, id: string | null | undefined): Player | undefined {
+  if (!id) return nextAliveAfter(state, null);
+  const p = findPlayer(state, id);
+  return p?.alive ? p : nextAliveAfter(state, id);
+}
+
+/**
+ * §8.2. Day 1 starts with the player the host chose (or the first alive in seating order).
+ * Later days: the next alive player after the previous day's opener (rotating),
+ * or day 1's opener again (fromFirst). Always by seating order — seat numbers are only labels.
+ */
 export function firstSpeakerFor(state: GameState): Player {
   const prev = state.days[state.days.length - 1];
   let first: Player | undefined;
-  if (prev && state.settings.speakingOrder === 'rotating') {
-    first = nextAliveAfter(state, prev.firstSpeaker);
-  } else {
-    // The first alive player in seating order.
-    first = nextAliveAfter(state, null);
-  }
+  if (!prev) first = fromSeat(state, state.dayOneOpener);
+  else if (state.settings.speakingOrder === 'rotating') first = nextAliveAfter(state, prev.firstSpeaker);
+  else first = fromSeat(state, state.days[0]!.firstSpeaker);
   if (!first) fail('day.noPlayers', 'Не осталось живых игроков');
   return first;
 }
 
-export function startDay(state: GameState, number: number): void {
-  const first = firstSpeakerFor(state);
-  const order: string[] = [];
+/** Alive players around the table, starting with `first`. */
+export function speakingOrderFrom(state: GameState, first: Player): Player[] {
+  const order: Player[] = [];
   let p: Player | undefined = first;
-  while (p && !order.includes(p.id)) {
-    order.push(p.id);
+  while (p && !order.includes(p)) {
+    order.push(p);
     p = nextAliveAfter(state, p.id);
   }
+  return order;
+}
+
+/** The host picks who opens day 1: only on the first morning, before the discussion starts. */
+export function chooseFirstSpeaker(state: GameState, playerId: string): void {
+  const ph = state.phase;
+  if (ph.t !== 'morning' || ph.number !== 1 || state.days.length > 0 || state.pendingResult) {
+    fail('opener.phase', 'Кто начинает обсуждение, выбирают утром первого дня');
+  }
+  const p = findPlayer(state, playerId);
+  if (!p) fail('player.unknown', 'Такого игрока нет');
+  if (!p.alive) fail('opener.out', `${label(p)} выбыл из игры`, { seat: p.seat });
+  state.dayOneOpener = p.id;
+}
+
+export function startDay(state: GameState, number: number): void {
+  const first = firstSpeakerFor(state);
+  const order = speakingOrderFrom(state, first).map((p) => p.id);
   const day: DayRecord = {
     number,
     firstSpeaker: first.id,

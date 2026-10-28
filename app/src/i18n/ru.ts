@@ -442,6 +442,13 @@ export const ru = {
     alibiBody: (p: Seat) => ` У игрока ${num(p.seat)} есть железное алиби: сегодня его нельзя выставить на голосование.`,
     savedBody: 'По слухам, этой ночью кого-то спасли.',
     overNote: 'Игра окончена — по итогам ночи определён победитель.',
+    openerLabel: 'обсуждение начинает',
+    openerChange: 'Выбрать, кто начинает',
+    openerTitle: 'Кто начинает обсуждение?',
+    openerHint: 'Выберите игрока, о котором договорились за столом. Дальше слово идёт по кругу — по порядку посадки, а не по номерам.',
+    openerOrder: (list: string) => `Дальше по кругу: ${list}`,
+    openerDefault: 'первый по посадке',
+    openerChosen: 'выбор ведущего',
   },
 
   speech: {
@@ -754,7 +761,7 @@ export const ru = {
       commissarManiacResult: { notMafia: '«Не мафия»', mafia: '«Мафия»' },
       doctorSelfHealLimit: { '0': 'Никогда', '1': 'Один раз', null: 'Без лимита' },
       revealRoleOnDeath: { none: 'Скрыта', team: 'Только команда', full: 'Раскрыта' },
-      speakingOrder: { rotating: 'Следующий по кругу', fromFirst: 'Всегда первый живой' },
+      speakingOrder: { rotating: 'Следующий по кругу', fromFirst: 'Всегда начавший первый день' },
       tieRule: { sports: 'Попил, переголосование, подъём всех', revoteThenNobody: 'Одно переголосование', nobody: 'Никто не уходит' },
     } as Record<string, Record<string, string>>,
   },
