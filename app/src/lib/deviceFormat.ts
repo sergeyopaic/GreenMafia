@@ -2,9 +2,10 @@ import { decodeHistory, decodePlayers, decodePrefs, decodeSetup, inspectGame, is
 import { decodeBackups } from './backups';
 import { runtimeFor } from './gameRuntime';
 import { normalizeName, MAX_NAME } from './players';
+import { decodeRuleProfiles } from './ruleProfiles';
 import type { SavedGame } from './storage';
 
-export const DEVICE_KEYS = ['gm.current', 'gm.history', 'gm.players', 'gm.lastSetup', 'gm.prefs', 'gm.backups'] as const;
+export const DEVICE_KEYS = ['gm.current', 'gm.history', 'gm.players', 'gm.lastSetup', 'gm.prefs', 'gm.backups', 'gm.ruleProfiles'] as const;
 export const DEVICE_COPIES_KEY = 'gm.deviceCopies';
 export const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 export type DeviceData = Partial<Record<(typeof DEVICE_KEYS)[number], unknown>>;
@@ -15,6 +16,8 @@ export interface ImportPlan {
   profiles: number;
   games: number;
   backups: number;
+  /** Saved rule profiles in the file (they replace the device's profiles). */
+  rules: number;
   hasCurrent: boolean;
 }
 export class ImportError extends Error {
@@ -55,16 +58,17 @@ export function inspectImport(raw: unknown): ImportPlan {
       const profiles = data['gm.players'] === undefined ? [] : decodePlayers(data['gm.players']);
       if (profiles.some((p) => p.name.length > MAX_NAME) || new Set(profiles.map((p) => normalizeName(p.name))).size !== profiles.length) throw new ImportError('invalid');
       const backups = data['gm.backups'] === undefined ? [] : decodeBackups(data['gm.backups']);
-      data['gm.history'] = history; data['gm.players'] = profiles; data['gm.backups'] = backups;
+      const rules = data['gm.ruleProfiles'] === undefined ? [] : decodeRuleProfiles(data['gm.ruleProfiles']);
+      data['gm.history'] = history; data['gm.players'] = profiles; data['gm.backups'] = backups; data['gm.ruleProfiles'] = rules;
       if (data['gm.prefs'] !== undefined) data['gm.prefs'] = decodePrefs(data['gm.prefs']);
       if (data['gm.lastSetup'] !== undefined) data['gm.lastSetup'] = decodeSetup(data['gm.lastSetup']);
-      return { kind: 'device', original, data, profiles: profiles.length, games: history.length, backups: backups.length, hasCurrent };
+      return { kind: 'device', original, data, profiles: profiles.length, games: history.length, backups: backups.length, rules: rules.length, hasCurrent };
     }
     const game = checkedGame(raw);
     const inspected = inspectGame(game);
     const finished = inspected.kind === 'ready' && inspected.game.state.phase.t === 'gameOver';
     if (finished) game.finishedAt ??= Date.now();
-    return { kind: 'game', original, data: { 'gm.current': game }, profiles: 0, games: finished ? 1 : 0, backups: 0, hasCurrent: !finished };
+    return { kind: 'game', original, data: { 'gm.current': game }, profiles: 0, games: finished ? 1 : 0, backups: 0, rules: 0, hasCurrent: !finished };
   } catch (error) { if (error instanceof ImportError) throw error; throw new ImportError('invalid'); }
 }
 

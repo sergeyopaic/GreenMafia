@@ -206,3 +206,20 @@ describe('атомарный импорт через IndexedDB', () => {
     expect(await a.get('gm.prefs')).toEqual({ sound: false }); expect(await a.get('gm.current')).toBeUndefined();
   });
 });
+
+describe('профили правил в файле устройства', () => {
+  it('переносятся вместе с данными, считаются в предпросмотре и проверяются', async () => {
+    const a = await api();
+    const { createProfile } = await import('./ruleProfiles'); const { CLASSIC_SETTINGS } = await import('@greenmafia/engine');
+    const rules = createProfile([], 'Наш клуб', { ...CLASSIC_SETTINGS, tieRule: 'nobody' }, 5);
+    const plan = a.inspectImport(envelope({ 'gm.ruleProfiles': rules }));
+    expect(plan).toMatchObject({ kind: 'device', rules: 1 });
+    await a.commitImport(plan, undefined, () => true);
+    expect(await a.get('gm.ruleProfiles')).toEqual(rules);
+    expect(() => a.inspectImport(envelope({ 'gm.ruleProfiles': [{ ...rules[0], settings: { tieRule: 'duel' } }] }))).toThrow();
+    // An older file without profiles replaces them like the rest of the device data; the rollback copy keeps them.
+    await a.commitImport(a.inspectImport(envelope({ 'gm.prefs': { sound: true } })), undefined, () => true);
+    expect(await a.get('gm.ruleProfiles')).toEqual([]);
+    expect((await a.loadDeviceCopies())[0]!.data['gm.ruleProfiles']).toEqual(rules);
+  });
+});

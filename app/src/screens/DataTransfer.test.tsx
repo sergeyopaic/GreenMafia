@@ -46,7 +46,7 @@ describe('предпросмотр и подтверждение импорта'
   it('показывает только количества, а отмена не пишет данные', async () => {
     await render();
     await file({ format: 'greenmafia-device-backup', version: 1, exportedAt: 1, data: { 'gm.current': legacy, 'gm.players': [{ id: 'pl_private', name: 'СЕКРЕТНОЕ ИМЯ', createdAt: 1 }] } });
-    expect(container.textContent).toContain(t.transfer.summary(0, 1, 0)); expect(container.textContent).toContain(t.transfer.replaceDevice);
+    expect(container.textContent).toContain(t.transfer.summary(0, 1, 0, 0)); expect(container.textContent).toContain(t.transfer.replaceDevice);
     expect(container.textContent).not.toContain('СЕКРЕТНОЕ ИМЯ'); expect(container.textContent).not.toContain('legacy-before-don');
     await click(t.common.cancel); expect(container.querySelector('.import-preview')).toBeNull();
     expect(commitImport).not.toHaveBeenCalled(); expect(set).not.toHaveBeenCalled();

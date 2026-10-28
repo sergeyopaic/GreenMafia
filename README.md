@@ -192,7 +192,7 @@ The host can pause the game, undo the last step, or open the **host console** to
 
 ## Rules you can tune
 
-Two presets, **Classic** and **Sports**, or your own mix:
+Two presets, **Classic** and **Sports**, or your own mix. Save your own mix as a **rule profile** ("My rules" on the Rules step) and pick it with one tap next time; profiles can be renamed, updated and deleted, and they travel with device export/import:
 
 - **Night:** first night (mafia meeting / all roles), whether the composition is announced, fake wake-ups for roles that are out, a minimum time per night step, whether the mafia may kill its own.
 - **Roles:** how the Maniac looks to the Commissar, the Doctor's self-heal limit and repeat heals, the Mistress's repeat visits, alibi, night protection and linked death, whether the alibi client votes.

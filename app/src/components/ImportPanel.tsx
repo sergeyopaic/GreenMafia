@@ -24,7 +24,7 @@ export function ImportPanel() {
     {error && <p className="notice notice--warn" role="alert">{error}</p>}
     {plan && <div className="import-preview" role="region" aria-labelledby="import-preview-title">
       <h3 id="import-preview-title">{plan.kind === 'device' ? f.deviceTitle : f.gameTitle}</h3>
-      <p>{f.summary(plan.games, plan.profiles, plan.backups)}</p>
+      <p>{f.summary(plan.games, plan.profiles, plan.backups, plan.rules)}</p>
       <p>{plan.hasCurrent ? f.hasCurrent : f.noCurrent}</p>
       <p>{plan.kind === 'device' ? f.replaceDevice : plan.hasCurrent ? f.replaceGame : f.addArchive}</p>
       <p className="list__sub">{f.backupHint}</p>

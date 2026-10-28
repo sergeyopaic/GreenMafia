@@ -18,11 +18,25 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { MiniChip } from '../components/Chip';
 import { SeatPicker } from '../components/SeatPicker';
-import { IconBack, RoleIcon } from '../components/icons';
+import { IconBack, IconClose, IconPen, RoleIcon } from '../components/icons';
+import { Confirm, Sheet } from '../components/Sheet';
 import { type PlayerProfile, loadPlayers, normalizeName, resolveSeats } from '../lib/players';
 import { type LastSetup, loadLastSetup } from '../lib/storage';
 import { type SettingMeta, getSetting, setSetting, settingsGroups } from '../lib/text';
-import { issueText, useT } from '../i18n';
+import { DICTS, issueText, useT } from '../i18n';
+import {
+  MAX_PROFILE_NAME,
+  MAX_RULE_PROFILES,
+  type RuleProfile,
+  createProfile,
+  loadRuleProfiles,
+  matchProfile,
+  profileNameError,
+  removeProfile,
+  renameProfile,
+  saveRuleProfiles,
+  updateProfileRules,
+} from '../lib/ruleProfiles';
 import { randomSeed, useApp } from '../store';
 
 type Step = 0 | 1 | 2 | 3 | 4;
@@ -535,10 +549,26 @@ function CompositionStep({
 
 // ---------- Step 3: rules ----------
 
+/** Built-in set names in every language: a rule profile may not borrow one. */
+const RESERVED_PROFILE_NAMES = Object.values(DICTS).flatMap((d) => Object.values(d.setup.presets));
+
 function RulesStep({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
   const t = useT();
   const st = t.setup;
-  const preset = samePreset(settings);
+  const builtIn = samePreset(settings);
+  const [profiles, setProfiles] = useState<RuleProfile[]>([]);
+  const active = matchProfile(profiles, settings);
+  const preset = builtIn !== 'custom' ? builtIn : active ? null : 'custom';
+
+  useEffect(() => {
+    void loadRuleProfiles().then(setProfiles);
+  }, []);
+
+  function persist(next: RuleProfile[]) {
+    setProfiles(next);
+    void saveRuleProfiles(next);
+  }
+
   return (
     <>
       <div className="field">
@@ -555,6 +585,7 @@ function RulesStep({ settings, onChange }: { settings: Settings; onChange: (s: S
           </button>
         </div>
       </div>
+      <RuleProfiles profiles={profiles} settings={settings} builtIn={builtIn !== 'custom'} active={active} onChange={onChange} onProfiles={persist} />
       {settingsGroups(t).map((g) => (
         <section className="folder" key={g.title}>
           <span className="folder__tab">{g.title}</span>
@@ -566,6 +597,169 @@ function RulesStep({ settings, onChange }: { settings: Settings; onChange: (s: S
         </section>
       ))}
     </>
+  );
+}
+
+type ProfileDialog = { kind: 'save' } | { kind: 'rename'; profile: RuleProfile } | { kind: 'delete'; profile: RuleProfile } | null;
+
+/** The host's saved rule sets: pick one, save the current rules, rename, update or delete. */
+function RuleProfiles({
+  profiles,
+  settings,
+  builtIn,
+  active,
+  onChange,
+  onProfiles,
+}: {
+  profiles: RuleProfile[];
+  settings: Settings;
+  builtIn: boolean;
+  active: RuleProfile | undefined;
+  onChange: (s: Settings) => void;
+  onProfiles: (list: RuleProfile[]) => void;
+}) {
+  const t = useT();
+  const pr = t.setup.profiles;
+  const toast = (text: string) => useApp.getState().showToast(text);
+  // The profile picked last on this screen: after edits it offers "save changes".
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+  const loaded = profiles.find((p) => p.id === loadedId);
+  // Edited since it was picked (switching to Classic or Sports is not an edit of the profile).
+  const dirty = loaded && !active && !builtIn ? loaded : undefined;
+  const [dialog, setDialog] = useState<ProfileDialog>(null);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const errorText = (code: NonNullable<ReturnType<typeof profileNameError>>) =>
+    code === 'full' ? pr.errors.full(MAX_RULE_PROFILES) : pr.errors[code];
+
+  function open(next: NonNullable<ProfileDialog>) {
+    setDraft(next.kind === 'rename' ? next.profile.name : '');
+    setError(null);
+    setDialog(next);
+  }
+
+  function submitName() {
+    if (!dialog || dialog.kind === 'delete') return;
+    const selfId = dialog.kind === 'rename' ? dialog.profile.id : undefined;
+    const err = profileNameError(profiles, draft, RESERVED_PROFILE_NAMES, selfId);
+    if (err) {
+      setError(errorText(err));
+      return;
+    }
+    if (dialog.kind === 'save') {
+      const next = createProfile(profiles, draft, settings);
+      const created = next[next.length - 1]!;
+      onProfiles(next);
+      setLoadedId(created.id);
+      toast(pr.saved(created.name));
+    } else {
+      onProfiles(renameProfile(profiles, dialog.profile.id, draft));
+    }
+    setDialog(null);
+  }
+
+  return (
+    <section className="folder">
+      <span className="folder__tab">{pr.title}</span>
+      {profiles.length === 0 && !builtIn && <p className="list__sub">{pr.empty}</p>}
+      {profiles.length > 0 && (
+        <div className="list">
+          {profiles.map((p) => {
+            const isActive = active?.id === p.id;
+            const status = isActive ? pr.active : dirty?.id === p.id ? pr.changed : null;
+            return (
+              <div className="list__row rule-profile" key={p.id}>
+                <button
+                  type="button"
+                  className="rule-profile__pick"
+                  aria-pressed={isActive}
+                  onClick={() => {
+                    onChange(structuredClone(p.settings));
+                    setLoadedId(p.id);
+                  }}
+                >
+                  <span className="list__title">{p.name}</span>
+                  {status && <span className="list__sub">{status}</span>}
+                </button>
+                <button type="button" className="icon-btn" aria-label={pr.renameAria(p.name)} onClick={() => open({ kind: 'rename', profile: p })}>
+                  <IconPen />
+                </button>
+                <button type="button" className="icon-btn" aria-label={pr.deleteAria(p.name)} onClick={() => setDialog({ kind: 'delete', profile: p })}>
+                  <IconClose />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {dirty && (
+        <button
+          type="button"
+          className="btn btn--secondary btn--block"
+          onClick={() => {
+            onProfiles(updateProfileRules(profiles, dirty.id, settings));
+            toast(pr.updated(dirty.name));
+          }}
+        >
+          {pr.update(dirty.name)}
+        </button>
+      )}
+      {builtIn && <p className="list__sub">{pr.builtIn}</p>}
+      {!builtIn && !active && (
+        <button type="button" className="btn btn--ghost" onClick={() => open({ kind: 'save' })}>
+          {pr.save}
+        </button>
+      )}
+
+      {dialog && dialog.kind !== 'delete' && (
+        <Sheet title={dialog.kind === 'save' ? pr.saveTitle : pr.renameTitle} onClose={() => setDialog(null)}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitName();
+            }}
+            style={{ display: 'grid', gap: 12 }}
+          >
+            <input
+              className="input"
+              value={draft}
+              maxLength={MAX_PROFILE_NAME}
+              placeholder={pr.namePlaceholder}
+              autoFocus
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setError(null);
+              }}
+              aria-label={pr.nameLabel}
+            />
+            {error && <p className="notice notice--warn">{error}</p>}
+            <div className="actions__row">
+              <button type="button" className="btn btn--secondary" onClick={() => setDialog(null)}>
+                {t.common.cancel}
+              </button>
+              <button type="submit" className="btn btn--primary btn--plain">
+                {t.common.save}
+              </button>
+            </div>
+          </form>
+        </Sheet>
+      )}
+      {dialog?.kind === 'delete' && (
+        <Confirm
+          title={pr.deleteTitle(dialog.profile.name)}
+          text={pr.deleteText}
+          okLabel={t.common.delete}
+          danger
+          onOk={() => {
+            onProfiles(removeProfile(profiles, dialog.profile.id));
+            if (loadedId === dialog.profile.id) setLoadedId(null);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+    </section>
   );
 }
 
