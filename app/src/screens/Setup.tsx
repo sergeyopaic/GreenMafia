@@ -19,8 +19,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { MiniChip } from '../components/Chip';
 import { SeatPicker } from '../components/SeatPicker';
 import { IconBack, RoleIcon } from '../components/icons';
-import { type PlayerProfile, loadPlayers, normalizeName, resolveSeats, savePlayers } from '../lib/players';
-import { type LastSetup, loadLastSetup, saveLastSetup } from '../lib/storage';
+import { type PlayerProfile, loadPlayers, normalizeName, resolveSeats } from '../lib/players';
+import { type LastSetup, loadLastSetup } from '../lib/storage';
 import { type SettingMeta, getSetting, setSetting, settingsGroups } from '../lib/text';
 import { issueText, useT } from '../i18n';
 import { randomSeed, useApp } from '../store';
@@ -180,11 +180,6 @@ export function SetupScreen() {
       setStep(0);
       return;
     }
-    if (seats.created.length > 0) {
-      const next = [...profiles, ...seats.created];
-      setProfiles(next);
-      void savePlayers(next);
-    }
     const event = {
       type: 'CreateGame' as const,
       settings,
@@ -194,8 +189,7 @@ export function SetupScreen() {
       ...(dealing === 'app' ? { seed: randomSeed() } : { roles: cardRoles as Role[] }),
     };
     const last: LastSetup = { names, seats: seatNums as number[], count, preset: samePreset(settings), settings, composition: comp, dealing };
-    void saveLastSetup(last);
-    startGame(event);
+    startGame(event, { setup: last, profiles: [...profiles, ...seats.created] });
   }
 
   const canNext =

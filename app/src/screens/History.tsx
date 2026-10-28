@@ -31,6 +31,7 @@ export function HistoryScreen() {
           <span>{h.sub}</span>
         </div>
       </header>
+      <button type="button" className="btn btn--secondary" onClick={() => go({ name: 'backups' })}>{t.recovery.backupsTitle}</button>
       {items && items.length === 0 && <p className="hand" style={{ fontSize: 22 }}>{h.empty}</p>}
       <div className="list">
         {items?.map((g) => {

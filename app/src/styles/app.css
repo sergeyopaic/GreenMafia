@@ -1597,6 +1597,35 @@ p {
 
 /* ---------- Setup ---------- */
 
+.settings__title { font: 24px / 1.2 var(--font-display); }
+.settings__section { display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding: 12px 0 22px; border-bottom: 1px solid var(--line); }
+.settings__section h2 { font-size: 27px; }
+.settings__section p { line-height: 1.55; }
+.settings__section .lang-switch { align-self: flex-start; }
+.settings .lang-switch button { min-height: 44px; }
+.settings__toggle { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 48px; cursor: pointer; }
+.settings__toggle input { width: 24px; height: 24px; flex: none; accent-color: var(--accent); }
+.license-notice { border: 1px solid var(--line); border-radius: var(--radius); }
+.license-notice summary { cursor: pointer; min-height: 48px; padding: 14px; overflow-wrap: anywhere; }
+.license-notice pre { padding: 0 14px 14px; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px / 1.5 var(--font-type); }
+.import-file { display: grid; gap: 10px; }
+.import-file input { max-width: 100%; min-height: 48px; font: inherit; }
+.import-preview { padding: 18px; border: 1px solid var(--brass); display: grid; gap: 16px; }
+.import-preview h3 { font-size: 26px; }
+.import-status { z-index: 900; animation: none; }
+
+.welcome { padding-top: max(24px, env(safe-area-inset-top)); gap: 24px; }
+.welcome__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.welcome h1 { font-size: clamp(32px, 9vw, 46px); line-height: 1.1; margin-bottom: 12px; }
+.welcome__lead { font-size: 18px; line-height: 1.5; }
+.welcome__steps { display: grid; gap: 20px; margin: 0; padding-left: 28px; }
+.welcome__steps li { padding-left: 6px; }
+.welcome__steps li::marker { color: var(--brass-light); font-family: var(--font-type); }
+.welcome__steps h2 { font-size: 25px; margin-bottom: 6px; }
+.welcome__steps p, .welcome__offline { font-size: 16px; line-height: 1.55; }
+.welcome__offline { padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); }
+.welcome .lang-switch button { min-height: 44px; }
+
 .wizard-steps {
   display: flex;
   gap: 6px;
@@ -1903,26 +1932,25 @@ p {
 .chips--large .chip__disc { width: min(54px, 15vw); }
 .chips--large .chip__tag { font-size: 10px; }
 .chips--large .chip { gap: 3px; }
-/* Answers to the commissar and the Don: a sheet of paper so the stamp reads as bright as on day screens. */
-.answer-sheet {
+/* Equal dark treatment for every night answer: no paper flash or result-dependent colour. */
+.check-response {
+  background: var(--bg-solid);
+  animation: none;
+}
+
+.night-answer {
   display: grid;
   place-items: center;
   width: min(88vw, 420px);
   min-height: 210px;
   padding: 34px 18px;
   border-radius: 6px;
-  color: var(--ink);
-  background: var(--tex-paper), var(--fibers), var(--noise-dark), var(--paper);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(27, 24, 19, 0.15);
-}
-
-.answer-sheet .stamp {
-  mix-blend-mode: multiply;
-  color: var(--stamp);
-}
-
-.answer-sheet .stamp--ok {
-  color: var(--felt-600);
+  color: var(--text);
+  background: var(--bg-solid);
+  border: 2px solid var(--line-strong);
+  font: 700 clamp(30px, 8vw, 48px) / 1.2 var(--font-ui);
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
 }
 .brand-mark { display: block; width: 72px; height: 72px; margin: 0 auto 18px; }
 .envelope__body > img, .envelope__body > svg { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: cover; border-radius: inherit; }
@@ -1941,6 +1969,73 @@ p {
 .placeholder-label {
   font-family: var(--font-type);
 }
+
+.storage-status { font-family: var(--font-type); font-size: 11px; text-align: right; color: var(--muted); padding: 4px 0; }
+.storage-warning { position: sticky; top: env(safe-area-inset-top); z-index: 150; display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--paper); color: var(--ink); border: 2px solid var(--stamp); border-radius: 4px; }
+.storage-warning p { margin: 4px 0 0; font-size: 14px; }
+.storage-warning .btn { flex: 0 0 auto; color: var(--ink); border-color: var(--ink); }
+.storage-read-error { z-index: 300; padding: 24px; }
+
+.data-dialog {
+  width: min(520px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 24px;
+  background: var(--bg-solid);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 60px #0008;
+}
+.data-dialog::backdrop { background: #000a; }
+.data-dialog h2 { font-size: 30px; }
+.data-dialog .actions { margin-top: 20px; }
+.recovery-notice { padding: 16px; border: 1px solid var(--brass); border-radius: var(--radius); text-align: left; }
+.recovery-notice p { margin: 10px 0; }
+.backup-card { padding: 18px 0; border-bottom: 1px solid var(--line); }
+.backup-card h3 { font-size: 25px; }
+
+.tab-status { z-index: 1100; animation: none; }
+.privacy-curtain {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg-solid, #08160f);
+  color: var(--text, #eee4cd);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  text-align: center;
+}
+[data-privacy='covered'] .privacy-curtain { display: flex; }
+[data-privacy='covered'] .app-content,
+[data-privacy='covered'] .data-dialog,
+[data-privacy='covered'] .toast { visibility: hidden; }
+
+[data-crash='blocked'] .app-content,
+[data-crash='blocked'] .data-dialog,
+[data-crash='blocked'] .toast { visibility: hidden; }
+.crash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  overflow-y: auto;
+  background: #0b1f16;
+  color: #eee4cd;
+  color-scheme: dark;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+  --text: #eee4cd;
+  --muted: #9db0a3;
+  --accent: #b9d94a;
+  --accent-ink: #08160f;
+  --line: #eee4cd40;
+}
+.crash-screen__body { max-width: 560px; margin: 0 auto; }
+.crash-screen h1 { font-size: clamp(32px, 8vw, 46px); }
+.crash-screen p { line-height: 1.5; }
+.crash-screen__section { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
 
 /* ---------- Reduced motion ---------- */
 

@@ -1,25 +1,44 @@
 import type { Phase } from '@greenmafia/engine';
 import { asset } from './assets';
-import { mayPlaySound, type Sfx } from './soundPolicy';
+import { mayPlaySound, mayVibrate, type Sfx } from './soundPolicy';
 export type { Sfx } from './soundPolicy';
 
 let enabled = true;
+let vibrationEnabled = true;
 let phase: Phase['t'] | null = null;
 let paused = false;
 let context: AudioContext | null = null;
 let epoch = 0;
+let vibrating = false;
 const buffers = new Map<string, Promise<AudioBuffer>>();
 const playing = new Set<AudioBufferSourceNode>();
 
-function stop(): void {
+function stopAudio(): void {
   epoch++;
-  for (const source of playing) source.stop();
+  for (const source of playing) {
+    try { source.stop(); } catch { /* An already stopped sound must not break error recovery. */ }
+  }
   playing.clear();
 }
 
+function stopVibration(): void {
+  // A day timer's pattern may still be running when night starts or the app is hidden.
+  if (vibrating) {
+    try { navigator.vibrate?.(0); } catch { /* Optional. */ }
+    vibrating = false;
+  }
+}
+
+function stop(): void { stopAudio(); stopVibration(); }
+
 export function setSoundEnabled(on: boolean): void {
   enabled = on;
-  if (!on) stop();
+  if (!on) stopAudio();
+}
+
+export function setVibrationEnabled(on: boolean): void {
+  vibrationEnabled = on;
+  if (!on) stopVibration();
 }
 
 /** Synchronous store subscription runs before screen effects can play. */
@@ -71,6 +90,6 @@ export function play(name: Sfx, volume = 0.8): void {
 }
 
 export function vibrate(pattern: number | number[]): void {
-  if (!enabled || paused || phase === 'night' || phase === 'reveal' || document.hidden) return;
-  try { navigator.vibrate?.(pattern); } catch { /* Optional. */ }
+  if (!vibrationEnabled || !mayVibrate(phase, paused) || document.hidden) return;
+  try { vibrating = navigator.vibrate?.(pattern) ?? false; } catch { /* Optional. */ }
 }

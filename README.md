@@ -40,13 +40,21 @@ English · Русский · Installable PWA · Works offline · Free for noncom
 GreenMafia is for a group of friends playing Mafia around a real table. It is **not** an online game: everyone sits together, and one person is the host and holds the phone. The app replaces the host's notebook, cards and stopwatch:
 
 - It **deals the roles.** The phone goes around the table and each player opens their own envelope. You can also deal physical cards and enter them.
-- It **runs the night.** It wakes the roles in the right order, shows who may be chosen and why someone may not, and shows the Commissar's and the Don's answers as big stamps the host can turn towards the player.
+- It **runs the night.** It wakes the roles in the right order, shows who may be chosen and why someone may not, and shows the Commissar's and the Don's answers as large, dark answer cards the host can turn towards the player. Night actions are silent, and blocked or fake wakes keep the same minimum wait.
 - It **resolves the night correctly.** That covers healing, the Mistress's block and alibi, linked death, the Maniac, kills on the same target and fake wake-ups for roles that are out.
 - It **runs the day.** Speeches go in seating order with a timer, then nominations, voting, ties, revotes and "everyone out" votes, defence speeches and last words.
 - It **knows when the game is over.** It checks the win conditions after every night, vote and removal. At the end it reveals all roles and shows the full chronicle.
 - It **remembers your club.** It keeps a player base with profiles and stats, plus a history of past games.
 
 The whole interface is available in **English and Russian**. Pick the language on the home screen.
+
+New installations open with a short introduction and an empty player base. The host adds local player profiles; players do not need accounts or Apple sign-in. Existing profiles and game history are preserved when updating. There is no automatic cross-device sync.
+
+Settings on Home includes language, independent sound/vibration controls, a "Keep screen on" mode (during a game, always or never), backups, export/import, data clearing, local-storage information, GitHub support, app version and full offline license texts.
+
+To transfer data, export a device file, move it to the other phone, then choose **Settings → Import from file**. Preview the counts before confirming. A device file replaces the current game, archive, profiles and preferences; an individual game becomes a separate copy. Files are validated locally, with a 20 MB limit. The app atomically keeps previous data and replaces the selected records, then requires a restart. Device copies from before imports/clearing history stay on that device and can be exported separately for restoration; they are not recursively included in transfer files.
+
+Clearing history keeps a recovery copy and preserves profiles, preferences and the current game. Clearing all data requires typing the displayed confirmation word and removes all app records, including internal backups; export anything needed first. Previously downloaded files remain outside the app. Safari/iPhone file selection, saving and sharing still need device testing.
 
 ## Features
 
@@ -84,7 +92,7 @@ The whole interface is available in **English and Russian**. Pick the language o
   <tr>
     <td align="center"><img src="docs/screenshots/reveal-envelope.webp" width="230" alt="Pass the phone"><br><sub>The phone goes around the table</sub></td>
     <td align="center"><img src="docs/screenshots/reveal-card.webp" width="230" alt="Role card"><br><sub>Hold to see your role. Mafia players see their accomplices</sub></td>
-    <td align="center"><img src="docs/screenshots/commissar-answer.webp" width="230" alt="Commissar's answer"><br><sub>At night the answer is shown as a stamp for the Commissar</sub></td>
+    <td align="center"><img src="docs/screenshots/commissar-answer.webp" width="230" alt="Commissar's answer in an earlier design"><br><sub>Commissar's answer; the current design uses a dark card</sub></td>
   </tr>
 </table>
 
@@ -195,12 +203,12 @@ The role briefs players see during the deal always describe the rules of *this* 
 
 ## Getting started
 
-Requirements: **Node.js 20.19+** and npm.
+Requirements: **Node.js 22** and npm (the version used in CI).
 
 ```bash
 git clone https://github.com/sergeyopaic/GreenMafia.git
 cd GreenMafia
-npm install
+npm ci
 npm run dev          # http://localhost:5173
 ```
 
@@ -219,9 +227,15 @@ Once it is opened over HTTPS, "Add to Home Screen" installs it as an app that wo
 | `npm run build` | Type-check and build the PWA |
 | `npm test` | Engine and app tests (Vitest) |
 | `npm run typecheck` | TypeScript in both packages |
+| `npm run check` | Type-check, test both packages and build the production PWA |
+| `npm run notices --workspace app` | Refresh bundled runtime/font license texts after dependency updates |
 | `npm run graphics --workspace app` | Regenerate the stamps (Russian and English), card back and emblem |
 | `npm run print-kit --workspace app` | Regenerate the A4 print kits (`print-kit.html`, `print-kit.en.html`) |
 | `npm run sounds --workspace app` | Regenerate the procedural sound effects |
+
+GitHub Actions runs `npm ci --no-audit --no-fund` and `npm run check` on pushes and pull requests; it can also be started manually. The workflow only verifies the project and does not publish it. App tests include storage failures, save recovery and React screen transitions in Happy DOM. These checks do not replace Safari, VoiceOver or physical iPhone testing; the remaining release checks are tracked in [TODO_RELEASE.md](TODO_RELEASE.md).
+
+Production builds also verify that `app/src/assets/licenses/third-party.json` matches the installed dependencies. The notices include runtime libraries and fonts, offline support from Workbox, and full Apache terms alongside idb-keyval's attribution. Regenerate the notices after updating dependencies and review any license changes before releasing.
 
 ## Project structure
 
@@ -247,7 +261,8 @@ GreenMafia/
 
 - **Event-sourced engine.** A game is a list of events (`CreateGame`, `NightChoose`, `Nominate`, `CastVotes`, `Foul`, `ChangeSeat`…). The state is always `events.reduce(apply)`. That gives undo for free, saves games completely, and makes every rule easy to test.
 - **The engine refuses illegal moves.** Every rejection has a code and parameters, for example `{ code: 'night.target', reason: 'target.doctor.repeat' }`. The app turns these into a message in the player's language, and the night grid explains why a chip is disabled.
-- **Tested logic.** The engine has 146 tests that cover the scenarios from the design document, including an exhaustive check that the win rules never overlap. The app adds tests for the player base, role briefs and assets.
+- **Tested logic.** The engine has 146 tests that cover the scenarios from the design document, including an exhaustive check that the win rules never overlap. App tests cover the player base, role briefs, assets, persistence, privacy and recovery after UI failures.
+- **Recovery after UI errors.** The app hides secrets and pauses the game before showing a recovery screen. It preserves the in-memory journal so remounting the interface cannot replace it with an older autosave. The host can export a private game file or a separate technical report that excludes names, roles, event logs and raw exception text; neither is sent automatically.
 - **Stack.** TypeScript, React 19, Vite 7, vite-plugin-pwa, Zustand and IndexedDB (idb-keyval), with self-hosted fonts: Oranienbaum, Commissioner, Anonymous Pro, Bad Script and Rubik Dirt.
 - **Translations.** `app/src/i18n/ru.ts` is the master dictionary and `en.ts` must have exactly the same shape, so TypeScript fails the build if a string is missing. Stamps and print kits are generated per language.
 

@@ -1,0 +1,22 @@
+{
+  "id": "legacy-before-don",
+  "createdAt": 1700000000000,
+  "events": [
+    {
+      "type": "CreateGame",
+      "settings": { "firstNight": "meeting", "timers": { "speech": 45 } },
+      "dealing": "cards",
+      "composition": { "civilian": 3, "mafia": 1, "commissar": 1, "doctor": 0, "lover": 0, "maniac": 0 },
+      "roles": ["mafia", "commissar", "civilian", "civilian", "civilian"],
+      "players": [
+        { "id": "p0", "name": "Один" },
+        { "id": "p1", "name": "Два" },
+        { "id": "p2", "name": "Три" },
+        { "id": "p3", "name": "Четыре" },
+        { "id": "p4", "name": "Пять" }
+      ]
+    },
+    { "type": "Proceed" },
+    { "type": "Proceed" }
+  ]
+}

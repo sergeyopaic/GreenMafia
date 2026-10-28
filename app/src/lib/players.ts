@@ -1,7 +1,9 @@
 // Player database: profiles stored on the device (IndexedDB), linked to games by player id.
 // A profile id is used as the in-game player id, so stats survive renames.
 
-import { get, set } from 'idb-keyval';
+import { set } from 'idb-keyval';
+import { readStored, writeStored } from './persistence';
+import { decodePlayers } from './saveFormat';
 
 export interface PlayerProfile {
   /** Starts with `pl_`; used as the player id inside games. */
@@ -9,9 +11,6 @@ export interface PlayerProfile {
   name: string;
   createdAt: number;
 }
-
-/** The first players of the club, created on the first launch. */
-export const SEED_PLAYERS = ['Сергей', 'Мика', 'Паша', 'Ира', 'Ульяна', 'Вова', 'Оля'];
 
 export const PROFILE_PREFIX = 'pl_';
 export const MAX_NAME = 20;
@@ -103,25 +102,12 @@ export function resolveSeats(
 
 // ---------- Storage ----------
 
-async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await fn();
-  } catch {
-    return fallback;
-  }
-}
-
-/** Loads the base; on the very first launch fills it with the seed players. */
+/** A new device starts empty. Never write initial data over a missing or unreadable base. */
 export async function loadPlayers(): Promise<PlayerProfile[]> {
-  const stored = await safe(() => get<PlayerProfile[]>(K_PLAYERS), undefined);
-  if (stored) return stored;
-  const now = Date.now();
-  const seeded = SEED_PLAYERS.map((name, i) => makeProfile(name, now + i));
-  await safe(() => set(K_PLAYERS, seeded), undefined);
-  return seeded;
+  return readStored<PlayerProfile[]>(K_PLAYERS, [], decodePlayers);
 }
 
-export const savePlayers = (list: PlayerProfile[]) => safe(() => set(K_PLAYERS, list), undefined);
+export const savePlayers = (list: PlayerProfile[]) => writeStored('players', () => set(K_PLAYERS, list));
 
 export function sortProfiles(list: readonly PlayerProfile[]): PlayerProfile[] {
   return [...list].sort((a, b) => a.name.localeCompare(b.name, 'ru'));

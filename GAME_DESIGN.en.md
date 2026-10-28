@@ -532,13 +532,27 @@ Rule: **the app never shows players information they must not have.** In host mo
 ### 11.4. Saving
 
 - The event log is saved to the device storage after every action.
+- The current voting draft (both entry modes, page and all-out vote) and speech/defense/last-word timer are saved separately. Drafts belong to a specific phase, round and speaker and do not carry over to another phase.
+- Hiding the app automatically pauses its timer. A restored game opens paused with its remaining time preserved; the host explicitly resumes it.
+- Writes are ordered; the current game and history update in one transaction. Write failures show a persistent warning with a retry action; read failures block editing instead of creating an empty database. An unreadable autosave is not deleted automatically.
+- Only one tab writes to the device data store. It holds an exclusive Web Lock until closed; backgrounding does not transfer ownership. A second tab does not load an editable session and requires closing the first and reloading to read fresh data. Without safe locking support, writes remain disabled; iOS compatibility is tested separately.
+- Losing focus, hiding the page or leaving it immediately covers the interface, clears role reveals, host peeks and night answers, and pauses the timer. Regaining focus neither reveals secrets nor starts the timer. While paused, the game screen is hidden from input and assistive technology; host information is not left behind the pause dialog. Native iOS app-switcher snapshot protection requires separate implementation.
 - When the app is opened with an unfinished game: "Continue game / Start a new one".
 - Recovery is tolerant: if some action in the log no longer passes the rule check (for example, the log was saved by an older version of the app), the game is restored up to the last valid action, and the host sees how many actions were dropped.
+- Before partial recovery, migration of an older format, or replacement of an unfinished game, the complete original is written to Backups. A failed backup cancels the transition. Replacing a game requires confirmation; cancelling preserves the current game, setup preferences and player database.
+- Game saves are versioned; the original unversioned format/compositions without the Don are migrated on opening, and unknown versions are not executed. Game, history, settings and profile inputs are validated before use. An unreadable autosave remains visible on Home and can be exported.
+- Backups are accessible from History and Settings: export the original file or restore a readable unfinished game, paused, after backing up the current game. Backups do not count towards statistics and are not deleted automatically except through explicitly confirmed full clearing. Files contain names and secret roles, and the interface warns about this before export.
+- Settings accepts a device JSON export or individual game up to 20 MB. Preview shows counts and replacement consequences only. Unknown versions, damaged/partly readable logs, invalid sections, duplicate profiles and archive conflicts are rejected without writing. Older formats are migrated in a copy and the original is retained separately. A device export replaces six data sections. Individual games receive a new ID: unfinished games replace the current game, paused; finished games are added to history without evicting existing games (adding is blocked at 500).
+- Before importing or clearing history, current data is kept in a device copy. The copy and replacement/clearing commit in one transaction, with rollback even on synchronous failures. Device copies and original import files can be exported from Backups; the copies list is not recursively included in transfer files. Restore previous data by choosing the exported copy in import. Existing saves finish before the operation; after success the stale UI and failed-write retries remain blocked until restart. Failed operations need a fresh confirmation and are never automatically retried.
+- Clearing history removes the archive and statistics calculated from it, preserving the current game, profiles, preferences and a recovery copy. Full clearing requires typing "DELETE" and removes all seven sections including internal copies, without retaining a hidden personal-data backup. A file export is offered first. Previously exported files remain outside the app; deleting a profile does not erase its name from old games or files.
+- An unexpected UI, event-handler or asynchronous-action error hides secrets and pauses the game. The recovery screen can remount the interface or return Home while preserving the in-memory journal; an older autosave cannot replace it, and an asynchronous transition started before the crash cannot change the recovered session. Only a fully validated journal is automatically checkpointed, paused; a damaged original remains available for explicit recovery.
+- The error screen exports a private game file with names/roles separately from a technical report without names, roles, journal, exception text or stack. The report contains the version/build, time, error category/source, screen/phase and storage status. Neither file is sent automatically. Reloading is a separate action with a warning about unsaved data.
 - The history of the last 500 games is kept (the event log: the chronicle, the result and player statistics are rebuilt from it).
 
 ### 11.4a. Player base
 
-- **Profile:** a name (up to 20 characters, unique ignoring case) and the date added. Stored on the device together with the history. On the first launch the base is filled with the club's players: Сергей (Sergey), Мика (Mika), Паша (Pasha), Ира (Ira), Ульяна (Ulyana), Вова (Vova), Оля (Olya).
+- **Profile:** a name (up to 20 characters, unique ignoring case) and the date added. Stored on the device together with the history. A new installation starts with an empty base; opening the screen or reading it again neither creates profiles nor writes initial data. Existing profiles, their IDs and links to statistics survive updates.
+- **No sign-in required:** player profiles are the host's local records, not player accounts. V1 has no Apple authentication, server account or automatic cross-device sync. A future host account for cloud features is designed separately from player IDs; signing in with Apple alone does not transfer the base.
 - **Link to games:** the profile id becomes the player id in a game. That is why renaming does not lose statistics.
 - **During game setup** players can be seated at the table by tapping them in the base (into free places in order; if there are no free places, one is added) or names can be typed in manually. At start every name is linked to a profile ignoring case; a new name is added to the base automatically; an empty place is a guest without a profile. One profile cannot sit at the table twice.
 - **Statistics** are not stored separately — they are computed from the history of finished games (aborted and unfinished games do not count): games, wins, win %, by team, by role, favourite role, how the player went out (survived / killed at night / eliminated / removed or left), recent games with a link to the case file in the archive. Games played before the base existed are counted by name match.
@@ -734,7 +748,13 @@ Host mode, phone in portrait orientation (tablet — two-column layout).
 ### 14.1. Home screen
 "New game" · "Continue" (if there is an unfinished game) · "Players" (base and profiles, §11.4a) · "Rules" · "Game history".
 
+On first launch, a short introduction appears before Home: 5–20 players plus a separate host, one phone, in-person conversation, setup and prompts, offline play in the installed app and local data without registration. Language selection is immediately available. "Set up a game" opens setup and "Go to Home" skips the introduction; both save that it was seen. "How to use" on Home reopens it without creating demo players/games. An unfinished game or data needing recovery takes priority over the introduction. Matching store positioning is drafted in `docs/STORE_DESCRIPTION.md` for final verification before publication.
+
+### 14.1a. App settings
+A separate Settings screen is accessible from Home: language, independent sound and vibration controls, a "Keep screen on" mode (during a game — the default / always / never; Screen Wake Lock, held only by the tab that owns the game; without browser support the app suggests a longer auto-lock time), internal backups, data export/import and clearing (§11.4), local-storage information, GitHub support, app version/build and full license texts. Backups return to Settings or History depending on where they were opened. Older preferences without a vibration field inherit their initial vibration setting from sound, so an update does not turn alerts on for previously muted users. License texts ship with the app; their separate module is included in the offline cache. Public privacy and final store-support contact details are prepared separately.
+
 ### 14.2. Game setup
+
 1. **Players:** the count (5–20); the seating order, clockwise ("up/down" arrows); everyone has the number from their card — tapping the chip opens a window with chips 1–20, taken ones are unavailable; "Reset all numbers" removes the numbers from everyone (a "?" chip), after which the window hands out numbers one after another, moving by itself to the next player without a number; while anyone has no number you cannot go further; names (from the base or typed in; by default "Player {number}"). The list of names and the numbers are remembered between games.
 2. **Composition:** recommended by the table, ± buttons per role, balance indicator, validation errors.
 3. **Rules:** a preset + expandable settings, each with an explanation.
@@ -753,6 +773,7 @@ Host mode, phone in portrait orientation (tablet — two-column layout).
 - Buttons: "Skip" ("Miss" for the mafia), "Next".
 - Commissar: after the choice — a full-screen card "MAFIA" / "NOT MAFIA" that the host turns towards the Commissar.
 - Don: after the choice — a card "COMMISSAR" / "NOT COMMISSAR".
+- Every answer uses the same dark background, panel size and text colour, without light paper, stamp animation or sound. The minimum wait also applies to blocked and fake wakes and stops while the game is paused. Consistent styling does not replace testing an actual screen's glow in a dark room.
 - Blocked role: instead of the grid — a big "The Mistress is with him" screen with the chip crossed out. No choice, only "Next".
 - Fake wake: the same screen, chips inactive, a note "The role is out — wait the pause" and a countdown.
 - Night step bar: Mistress · Commissar · Doctor · Mafia · Don · Maniac.
@@ -892,7 +913,7 @@ All fonts have been checked: they **support Cyrillic**. They are bundled locally
 - Touch targets ≥ 48 px; chips for 20 players fit on a phone screen without scrolling (a 4×5 grid).
 - Night screens are dark and dim.
 - All important actions come with a confirmation or undo.
-- Sound and vibration ⚙️ can be turned on and off.
+- Sound and vibration ⚙️ can be turned on and off independently in Settings and the host menu; night restrictions apply regardless of preferences.
 
 ---
 
@@ -904,7 +925,7 @@ Card portraits are shown in full, keeping their proportions and anchored to the 
 
 Role briefs are generated from the game's settings and are available during the deal only while held, and to the host in the "Rules of this game" menu. On release, loss of focus or when the tab is hidden, the secret text is removed from the screen. An A4 kit is available: seat numbers 1–20 and a general guide (`app/public/print-kit.html`).
 
-The night sound policy is centralised: only the shared signal for the start of the night and for the morning are allowed; the answer to the Commissar is silent. Playback stops on pause, when sound is turned off and when the phase changes. All supported image and audio formats are included in the offline cache. The typewriter sound is prepared but not bound to night lines. Background music, host voice-over and the four game-over illustrations remain P2.
+The night sound policy is centralised: only the shared signal for the start of the night and for the morning are allowed; target choices, rejections, blocks, fake wakes and Commissar/Don answers are silent. Vibration is forbidden at night and during the deal. Playback and an already running vibration pattern stop on pause, when the page is hidden and when the phase changes; disabling an individual alert cancels only that alert. Delayed decoding cannot resurrect an outdated sound. All supported image and audio formats are included in the offline cache. The typewriter sound is prepared but not bound to night lines. Background music, host voice-over and the four game-over illustrations remain P2.
 
 **Until an asset exists, the app draws a placeholder:** a stylised SVG with a caption, in the palette. To replace a placeholder, drop a file into **`app/src/assets/`** at the given path (paths in the tables below are relative to it, without `assets/`; any extension of webp/png/jpg/svg, for sound — mp3/ogg/m4a/wav). No code changes needed: the app finds the files at build time. Details — `app/src/assets/README.md`. Exception — the app icons: `app/public/assets/brand/`.
 

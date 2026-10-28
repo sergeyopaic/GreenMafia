@@ -17,16 +17,21 @@ import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import { applyTextures } from './lib/assets';
 import { initSound } from './lib/sound';
+import { CrashGuard } from './components/CrashGuard';
+import { installCrashHandlers, reportCrash } from './lib/crashRecovery';
 
-applyTextures();
-initSound();
-registerSW({ immediate: true });
+installCrashHandlers();
+try {
+  applyTextures();
+  initSound();
+  registerSW({ immediate: true, onRegisterError: () => { /* An unavailable service worker must not stop local play. */ } });
+} catch (error) { reportCrash(error, 'startup'); }
 
 const root = document.getElementById('root');
 if (root) {
-  createRoot(root).render(
+  createRoot(root, { onCaughtError: (error) => reportCrash(error, 'react'), onUncaughtError: (error) => reportCrash(error, 'react') }).render(
     <StrictMode>
-      <App />
+      <CrashGuard><App /></CrashGuard>
     </StrictMode>,
   );
 }

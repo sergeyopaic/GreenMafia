@@ -15,7 +15,9 @@ export function RevealScreen() {
   const dispatch = useApp((s) => s.dispatch);
   const ph = state.phase.t === 'reveal' ? state.phase : null;
   const [stage, setStage] = useState<'pass' | 'open'>('pass');
-  const [holding, setHolding] = useState(false);
+  const holding = useApp((s) => s.secrets.role);
+  const setHolding = (open: boolean) => useApp.getState().setSecret('role', open);
+  const privacyEpoch = useApp((s) => s.privacyEpoch);
   const [seen, setSeen] = useState(false);
   const [detail, setDetail] = useState(false);
 
@@ -25,20 +27,16 @@ export function RevealScreen() {
     setSeen(false);
     setHolding(false);
     setDetail(false);
-  }, [index]);
+  }, [index, privacyEpoch]);
 
   useEffect(() => {
     if (!holding) return;
     const up = () => setHolding(false);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
-    window.addEventListener('blur', up);
-    document.addEventListener('visibilitychange', up);
     return () => {
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      window.removeEventListener('blur', up);
-      document.removeEventListener('visibilitychange', up);
     };
   }, [holding]);
 

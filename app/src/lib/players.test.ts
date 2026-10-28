@@ -1,17 +1,13 @@
 import { CLASSIC_SETTINGS, type GameEvent, type Role, emptyComposition, newGame, dispatch } from '@greenmafia/engine';
 import { describe, expect, it } from 'vitest';
 import { finishedGames, playerStats } from './playerStats';
-import { SEED_PLAYERS, type PlayerProfile, findByName, nameError, resolveSeats } from './players';
+import { type PlayerProfile, findByName, nameError, resolveSeats } from './players';
 import type { SavedGame } from './storage';
 
 const profile = (id: string, name: string): PlayerProfile => ({ id, name, createdAt: 0 });
 const BASE = [profile('pl_s', 'Сергей'), profile('pl_m', 'Мика'), profile('pl_p', 'Паша')];
 
 describe('база игроков', () => {
-  it('первые игроки клуба', () => {
-    expect(SEED_PLAYERS).toEqual(['Сергей', 'Мика', 'Паша', 'Ира', 'Ульяна', 'Вова', 'Оля']);
-  });
-
   it('имя находится без учёта регистра и лишних пробелов', () => {
     expect(findByName(BASE, '  мИка ')?.id).toBe('pl_m');
     expect(findByName(BASE, '')).toBeUndefined();

@@ -10,3 +10,8 @@ export function mayPlaySound(name: Sfx, phase: Phase['t'] | null, paused: boolea
   if (phase === 'reveal') return name === 'envelope';
   return true;
 }
+
+/** Haptics can expose a silent night action just as clearly as sound. */
+export function mayVibrate(phase: Phase['t'] | null, paused: boolean): boolean {
+  return !paused && phase !== 'night' && phase !== 'reveal';
+}

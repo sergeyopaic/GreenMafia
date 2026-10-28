@@ -1,8 +1,7 @@
 import { type Player, type Reason, getCommissarResult, getDonResult, getNightStepView } from '@greenmafia/engine';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Chip, ChipGrid } from '../../components/Chip';
 import { RoleIcon } from '../../components/icons';
-import { Stamp } from '../../components/Stamp';
 import { TypeLine } from '../../components/TypeLine';
 import { play } from '../../lib/sound';
 import { type Dict, reasonText, useT } from '../../i18n';
@@ -38,7 +37,8 @@ export function NightScreen() {
   const night = state.nights[state.nights.length - 1];
   const stepKey = `${night?.number}-${view?.index}`;
   const elapsed = useElapsed(stepKey);
-  const [showCheck, setShowCheck] = useState(false);
+  const showCheck = useApp((s) => s.secrets.answer);
+  const setShowCheck = (open: boolean) => useApp.getState().setSecret('answer', open);
 
   useEffect(() => {
     setShowCheck(false);
@@ -166,10 +166,8 @@ export function NightScreen() {
       {showCheck && step === 'commissar' && checkResult && (
         <div className="overlay check-response" onClick={() => setShowCheck(false)} role="dialog" aria-label={n.answerCommissar}>
           <div className="eyebrow">{n.answerCommissar}</div>
-          <div className="answer-sheet">
-            {checkResult === 'mafia' && <Stamp kind="checked-mafia" big silent rotate={-6} />}
-            {checkResult === 'notMafia' && <Stamp kind="checked-clean" big silent rotate={-4} />}
-            {checkResult === 'noAnswer' && <Stamp kind="no-answer" big silent rotate={-3} />}
+          <div className="night-answer">
+            {t.stamps[checkResult === 'mafia' ? 'checked-mafia' : checkResult === 'notMafia' ? 'checked-clean' : 'no-answer']}
           </div>
           <p className="muted type">{n.showToCommissar}</p>
         </div>
@@ -177,10 +175,8 @@ export function NightScreen() {
       {showCheck && step === 'don' && donCheck && (
         <div className="overlay check-response" onClick={() => setShowCheck(false)} role="dialog" aria-label={n.answerDon}>
           <div className="eyebrow">{n.answerDon}</div>
-          <div className="answer-sheet">
-            {donCheck === 'commissar' && <Stamp kind="checked-commissar" big silent rotate={-6} />}
-            {donCheck === 'notCommissar' && <Stamp kind="checked-not-commissar" big silent rotate={-4} />}
-            {donCheck === 'noAnswer' && <Stamp kind="no-answer" big silent rotate={-3} />}
+          <div className="night-answer">
+            {t.stamps[donCheck === 'commissar' ? 'checked-commissar' : donCheck === 'notCommissar' ? 'checked-not-commissar' : 'no-answer']}
           </div>
           <p className="muted type">{n.showToDon}</p>
         </div>

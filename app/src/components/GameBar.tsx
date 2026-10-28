@@ -42,11 +42,12 @@ export function GameBar() {
   const t = useT();
   const b = t.bar;
   const game = useApp((s) => s.game);
-  const { dispatch, undo, paused, setPaused, closeGame, sound, toggleSound } = useApp();
+  const { dispatch, undo, paused, setPaused, closeGame, sound, toggleSound, vibration, toggleVibration } = useApp();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [tab, setTab] = useState<'players' | 'game'>('players');
   const [draft, setDraft] = useState('');
-  const [peek, setPeek] = useState(false);
+  const peek = useApp((s) => s.secrets.peek);
+  const setPeek = (open: boolean) => useApp.getState().setSecret('peek', open);
   const { title, sub } = phaseTitle(state, t);
   const over = state.phase.t === 'gameOver';
   const inReveal = state.phase.t === 'reveal';
@@ -63,6 +64,8 @@ export function GameBar() {
       window.removeEventListener('pointercancel', up);
     };
   }, [peek]);
+
+  useEffect(() => { if (paused) setDialog(null); }, [paused]);
 
   function onUndo() {
     if (!game) return;
@@ -88,6 +91,15 @@ export function GameBar() {
     if (state.settings.fouls && p.fouls > 0) parts.push(t.count.fouls(p.fouls));
     return parts.join(' · ');
   }
+
+  if (paused) return (
+    <div className="overlay" role="dialog" aria-modal="true" aria-label={b.pausedTitle}>
+      <div className="eyebrow">{b.pausedEyebrow}</div>
+      <h1>{b.pausedTitle}</h1>
+      <p className="muted">{b.pausedHint}</p>
+      <button autoFocus type="button" className="btn btn--primary" onClick={() => setPaused(false)}>{b.resume}</button>
+    </div>
+  );
 
   return (
     <>
@@ -151,17 +163,6 @@ export function GameBar() {
         </div>
       )}
 
-      {paused && (
-        <div className="overlay">
-          <div className="eyebrow">{b.pausedEyebrow}</div>
-          <h1>{b.pausedTitle}</h1>
-          <p className="muted">{b.pausedHint}</p>
-          <button type="button" className="btn btn--primary" onClick={() => setPaused(false)}>
-            {b.resume}
-          </button>
-        </div>
-      )}
-
       {dialog === 'menu' && (
         <Sheet title={b.console} onClose={() => setDialog(null)}>
           <div className="tabs" role="tablist">
@@ -196,6 +197,9 @@ export function GameBar() {
               </button>
               <button type="button" className="sheet__item" onClick={toggleSound}>
                 <IconSound off={!sound} /> {b.sound(sound)}
+              </button>
+              <button type="button" className="sheet__item" onClick={toggleVibration}>
+                {b.vibration(vibration)}
               </button>
               {!over && (
                 <>

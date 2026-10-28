@@ -31,10 +31,13 @@ function CandidateRound() {
   const v = t.voting;
   const dispatch = useApp((s) => s.dispatch);
   const candidates = (ph?.candidates ?? []).map(byId);
-  const [votes, setVotes] = useState<Record<string, string[]>>(() => Object.fromEntries(candidates.map((c) => [c.id, []])));
-  const [page, setPage] = useState(0);
-  const [quick, setQuick] = useState(false);
-  const [counts, setCounts] = useState<Record<string, number>>(() => Object.fromEntries(candidates.map((c) => [c.id, 0])));
+  const draft = useApp((s) => s.runtime?.voting);
+  const updateDraft = useApp((s) => s.updateVotingDraft);
+  const votes = draft?.votes ?? {};
+  const counts = draft?.counts ?? {};
+  const page = draft?.page ?? 0;
+  const quick = draft?.quick ?? false;
+  const setPage = (value: number | ((n: number) => number)) => updateDraft((d) => ({ ...d, page: typeof value === 'function' ? value(d.page) : value }));
   const [lastTap, setLastTap] = useState<string | null>(null);
 
   const owner = useMemo(() => {
@@ -60,10 +63,10 @@ function CandidateRound() {
       useApp.getState().showToast(v.alreadyVotes(p.seat, byId(holder).seat));
       return;
     }
-    setVotes((v) => {
-      const list = v[current.id] ?? [];
+    updateDraft((d) => {
+      const list = d.votes[current.id] ?? [];
       const next = list.includes(p.id) ? list.filter((x) => x !== p.id) : [...list, p.id];
-      return { ...v, [current.id]: next };
+      return { ...d, votes: { ...d.votes, [current.id]: next } };
     });
     if (!votes[current.id]?.includes(p.id)) {
       setLastTap(p.id);
@@ -122,7 +125,7 @@ function CandidateRound() {
             <QuickCount
               value={counts[current.id] ?? 0}
               max={eligible.length - cast + (counts[current.id] ?? 0)}
-              onChange={(n) => setCounts((c) => ({ ...c, [current.id]: n }))}
+              onChange={(n) => updateDraft((d) => ({ ...d, counts: { ...d.counts, [current.id]: n } }))}
             />
           ) : (
             <ChipGrid
@@ -176,7 +179,7 @@ function CandidateRound() {
       )}
 
       <div className="actions">
-        <button type="button" className="btn btn--ghost" style={{ alignSelf: 'center', minHeight: 32 }} onClick={() => setQuick((q) => !q)}>
+        <button type="button" className="btn btn--ghost" style={{ alignSelf: 'center', minHeight: 32 }} onClick={() => updateDraft((d) => ({ ...d, quick: !d.quick }))}>
           {quick ? v.byChips : v.byNumber}
         </button>
         <div className="actions__row">
@@ -224,9 +227,11 @@ function AllOutRound() {
   const t = useT();
   const v = t.voting;
   const dispatch = useApp((s) => s.dispatch);
-  const [yes, setYes] = useState<string[]>([]);
-  const [quick, setQuick] = useState(false);
-  const [count, setCount] = useState(0);
+  const draft = useApp((s) => s.runtime?.voting);
+  const updateDraft = useApp((s) => s.updateVotingDraft);
+  const yes = draft?.yes ?? [];
+  const quick = draft?.quick ?? false;
+  const count = draft?.count ?? 0;
   if (!ph) return null;
   const tied = ph.candidates.map(byId);
   const n = quick ? count : yes.length;
@@ -247,7 +252,7 @@ function AllOutRound() {
         </div>
       </div>
       {quick ? (
-        <QuickCount value={count} max={eligible.length} onChange={setCount} />
+        <QuickCount value={count} max={eligible.length} onChange={(n) => updateDraft((d) => ({ ...d, count: n }))} />
       ) : (
         <ChipGrid
           players={state.players}
@@ -260,12 +265,12 @@ function AllOutRound() {
           })}
           onPick={(p) => {
             if (!eligibleIds.has(p.id)) return;
-            setYes((y) => (y.includes(p.id) ? y.filter((x) => x !== p.id) : [...y, p.id]));
+            updateDraft((d) => ({ ...d, yes: d.yes.includes(p.id) ? d.yes.filter((x) => x !== p.id) : [...d.yes, p.id] }));
           }}
         />
       )}
       <div className="actions">
-        <button type="button" className="btn btn--ghost" style={{ alignSelf: 'center', minHeight: 32 }} onClick={() => setQuick((q) => !q)}>
+        <button type="button" className="btn btn--ghost" style={{ alignSelf: 'center', minHeight: 32 }} onClick={() => updateDraft((d) => ({ ...d, quick: !d.quick }))}>
           {quick ? v.byChipsShort : v.byNumber}
         </button>
         <button

@@ -14,6 +14,7 @@ export function GameScreen() {
   const t = useT();
   const handBackAck = useApp((s) => s.handBackAck);
   const ackHandBack = useApp((s) => s.ackHandBack);
+  const paused = useApp((s) => s.paused);
   const ph = state.phase;
 
   const needHandBack = state.dealing === 'app' && ph.t === 'night' && ph.number === 1 && ph.stepIndex === 0 && !handBackAck;
@@ -21,26 +22,28 @@ export function GameScreen() {
   return (
     <>
       <GameBar />
-      {ph.t === 'reveal' && <RevealScreen />}
-      {ph.t === 'night' && <NightScreen />}
-      {ph.t === 'morning' && <MorningScreen />}
-      {ph.t === 'lastWords' && <LastWordsScreen />}
-      {ph.t === 'discussion' && <DiscussionScreen />}
-      {ph.t === 'voting' && <VotingScreen />}
-      {ph.t === 'defense' && <DefenseScreen />}
-      {ph.t === 'verdict' && <VerdictScreen />}
-      {ph.t === 'gameOver' && <GameOverScreen />}
+      <div inert={paused} aria-hidden={paused} style={{ visibility: paused ? 'hidden' : undefined }}>
+        {ph.t === 'reveal' && <RevealScreen />}
+        {ph.t === 'night' && <NightScreen />}
+        {ph.t === 'morning' && <MorningScreen />}
+        {ph.t === 'lastWords' && <LastWordsScreen />}
+        {ph.t === 'discussion' && <DiscussionScreen />}
+        {ph.t === 'voting' && <VotingScreen />}
+        {ph.t === 'defense' && <DefenseScreen />}
+        {ph.t === 'verdict' && <VerdictScreen />}
+        {ph.t === 'gameOver' && <GameOverScreen />}
 
-      {needHandBack && (
-        <div className="overlay">
-          <div className="eyebrow">{t.game.dealt}</div>
-          <h1>{t.game.handBack}</h1>
-          <p className="muted">{t.game.handBackHint}</p>
-          <button type="button" className="btn btn--primary" onClick={ackHandBack}>
-            {t.game.handBackOk}
-          </button>
-        </div>
-      )}
+        {needHandBack && (
+          <div className="overlay">
+            <div className="eyebrow">{t.game.dealt}</div>
+            <h1>{t.game.handBack}</h1>
+            <p className="muted">{t.game.handBackHint}</p>
+            <button type="button" className="btn btn--primary" onClick={ackHandBack}>
+              {t.game.handBackOk}
+            </button>
+          </div>
+        )}
+      </div>
     </>
   );
 }
