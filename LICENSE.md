@@ -1,4 +1,4 @@
-Required Notice: Copyright 2026 Sergey Ivanov (https://github.com/sergeyopaic/GreenMafia)
+Required Notice: Copyright 2026 Sergey Ivanov and Mikael Ahabalyants (https://github.com/sergeyopaic/GreenMafia)
 
 # PolyForm Noncommercial License 1.0.0
 

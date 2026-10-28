@@ -32,6 +32,7 @@ English · Русский · Installable PWA · Works offline · Free for noncom
 - [Under the hood](#under-the-hood)
 - [Documentation](#documentation)
 - [Assets and credits](#assets-and-credits)
+- [Authors](#authors)
 - [License](#license)
 
 ## What it is
@@ -263,14 +264,19 @@ The full rules, every edge case, the settings, the host script, the screens and 
 - The sound effects are original and generated procedurally by [`app/scripts/make-sounds.mjs`](app/scripts/make-sounds.mjs).
 - The stamps use **Rubik Dirt** under the SIL Open Font License ([license](app/src/assets/RUBIK-DIRT-LICENSE.txt)). The other fonts come from [Fontsource](https://fontsource.org/), each under its own open license.
 
+## Authors
+
+- **Sergey Ivanov** — [@sergeyopaic](https://github.com/sergeyopaic)
+- **Mikael Ahabalyants** — [@njxqlus](https://github.com/njxqlus)
+
 ## License
 
 GreenMafia is **source-available** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
 
 - ✅ **You may** use the app for free, play it with friends or in an amateur club, study the code, change it and share your changes — for any noncommercial purpose. Schools, charities and other noncommercial organizations may use it too.
 - ❌ **You may not** sell the app or a copy of it (including a paid or ad-supported version in an app store), or use the code in any commercial product or service.
-- 📝 Every copy must keep the license and the `Required Notice` line with the author's name.
+- 📝 Every copy must keep the license and the `Required Notice` line with the authors' names.
 
-Want to use GreenMafia commercially? [Open an issue](https://github.com/sergeyopaic/GreenMafia/issues) to ask for a commercial license.
+Want to use GreenMafia commercially? [Open an issue](https://github.com/sergeyopaic/GreenMafia/issues) to ask the authors for a commercial license.
 
-Copyright © 2026 Sergey Ivanov. The fonts keep their own licenses (see [Assets and credits](#assets-and-credits)).
+Copyright © 2026 Sergey Ivanov and Mikael Ahabalyants. The fonts keep their own licenses (see [Assets and credits](#assets-and-credits)).
