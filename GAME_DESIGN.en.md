@@ -572,7 +572,7 @@ Rule: **the app never shows players information they must not have.** In host mo
 
 ## 12. Settings
 
-All settings are chosen before the game and **do not change during the game**. There are presets: **"Classic"** (the defaults below), "Sports" and "Custom". The host saves their own sets as **rule profiles** ("My rules" on the Rules step): up to 30 profiles with unique names (never a standard set name), picked with one tap, renamed, deleted, and updated with "Save changes" after editing a loaded profile. Profiles live on the device (), are part of device export and import, survive clearing the history and are removed by clearing all data.
+All settings are chosen before the game and **do not change during the game**. There are presets: **"Classic"** (the defaults below), "Sports" and "Custom". The host saves their own sets as **rule profiles** ("My rules" on the Rules step): up to 30 profiles with unique names (never a standard set name), picked with one tap, renamed, deleted, and updated with "Save changes" after editing a loaded profile. Profiles live on the device (`gm.ruleProfiles`), are part of device export and import, survive clearing the history and are removed by clearing all data.
 
 | Key | Values | Default | Section |
 |---|---|---|---|
